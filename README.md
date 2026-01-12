@@ -1,2 +1,5 @@
 # ArtInium
-First Stage (and beyond?) Bootloader for BeagleV Fire - Written for Academic Purposes, in Zig 0.15.2
+
+WIP
+---
+ArtInium is planned to be a first and second stage Bootloader for x86_32 qemu emulator written in zig 0.15.2 (freestanding). It will do the bare minimum to load a kernel, but will contain PIO drivers for IDE devices.
