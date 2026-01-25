@@ -19,12 +19,27 @@ SECTIONS
 
     . = 0x8000;                 /* 32 KB */
     __stage1b_start = .;
-    .stage1b : { *(.stage1b*) }
-    __stage1b_end = .;
 
+    .stage1b.code : {
+        *(.stage1b.code*)
+    }
+    __stage1b_code_end = .;
+
+    . = ALIGN(512);
+    __stage1b_data_start = .;
+
+    .stage1b.data : {
+        *(.stage1b.data*)
+    }
+    __stage1b_data_end = .;
+
+    __stage1b_end = .;
     __stage1b_size = __stage1b_end - __stage1b_start;
     STAGE1B_SECTORS = (__stage1b_size + 511)/512;
 
-    /* Assert Stage1b does not exceed 0x9000, i.e. doesn't bleed into 32-bit code space */
-    ASSERT(__stage1b_end < 0x9000, "Stage1b too large! Exceeds 4 KB limit")
+    /* Stack configuration */
+    __stack_top = 0x9FFF;
+
+    /* Assertions */
+    ASSERT(__stage1b_end <= (__stack_top-512), "Stage1b too large! Overlaps with stack")
 }

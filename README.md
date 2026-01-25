@@ -18,16 +18,18 @@ ArtInium is a multi-stage bootloader that replaces GRUB for x86_32 QEMU environm
 
 ### Stage 1b (up to 4KB @ 0x8000)
 - **Hello World message** - Displays boot message via BIOS INT 10h
-- **VGA/VBE detection** - Queries and sets up VBE framebuffer mode (1024x768x16)
 - **E820 memory map** - Collects system memory layout from BIOS
+- **VGA/VBE detection** - Queries available VBE modes (doesn't set mode yet)
+- **Boot info preparation** - Prepares structure with memory map and VBE mode info
 - **Protected mode transition** - Sets up GDT and switches to 32-bit mode
 - Jumps to Stage 2 at 0x10000
 
 ### Stage 2 (@ 0x10000 / 64KB)
 - 32-bit protected mode code (written in Zig)
+- **Video mode setup** - Uses Bochs VBE extensions to set graphics mode in protected mode
 - Will contain storage drivers (IDE, AHCI, etc.)
 - Loads and launches the kernel
-- Currently: stub implementation
+- Currently: demonstrates video mode switching using boot info from Stage 1b
 
 ## Building
 
@@ -72,19 +74,30 @@ Press `Ctrl+A` then `X` to exit QEMU.
 ✅ MBR boot sector with A20 enable  
 ✅ Multi-sector Stage 1b loading  
 ✅ BIOS text output (Hello World)  
-✅ VBE framebuffer detection and setup  
+✅ VBE mode detection and enumeration  
 ✅ E820 memory map collection  
+✅ Boot info structure for Stage 1b → Stage 2 handoff  
 ✅ GDT setup and protected mode switch  
 ✅ Clean handoff to 32-bit Stage 2  
+✅ Bochs VBE extensions for video mode switching in protected mode  
 
 ## TODO
 
 - [ ] Implement Stage 2 disk drivers
 - [ ] Add file system support (FAT32/ext2)
 - [ ] Kernel loading and parsing
-- [ ] Pass boot information structure to kernel
+- [ ] Parse kernel video mode requests from headers
 - [ ] Add error handling and recovery
 
 ## License
 
 MIT License - See LICENSE file
+
+
+# docs
+
+VGA docs:
+---
+- https://wiki.osdev.org/Bochs_VBE_Extensions
+- https://www.qemu.org/docs/master/specs/standard-vga.html
+- https://wiki.osdev.org/VESA_Video_Modes

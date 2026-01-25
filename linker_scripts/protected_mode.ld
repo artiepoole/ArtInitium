@@ -9,16 +9,34 @@ ENTRY(Artinium_32_entry)
 
 SECTIONS {
     . = 0x10000; /* 64 KB */
-    MAGIC = 0x49545241;                     /* "ARTI" in little-endian */
-    STAGE2_SIZE  = __stage2_end - __stage2_start; /* dynamic size of 32-bit code */
 
     __stage2_start = .;
-    .text : { *(.text*) }
-    .rodata : { *(.rodata*) }
-    .data : { *(.data*) }
-    .bss : { *(.bss*) }
-    __stage2_end = .;
+    
+    /* Stage2 Header - must be first! */
+    .stage2_header : {
+        LONG(0x49545241);                    /* "ARTI" magic in little-endian */
+        LONG(__stage2_file_end - __stage2_start); /* actual file size (excluding .bss) */
+    }
+    . = 0x10010; /* 64 KB + 16 bytes for header */
+    /* Entry point must be immediately after header */
+    .text : ALIGN(1)
+    {
+        KEEP(*(.text.entry))   /* FORCE FIRST */
+        *(.text*)
+    }
+    .rodata : ALIGN(1) { *(.rodata*) }
+    .data : ALIGN(1) { *(.data*) }
+
+    __stage2_file_end = .;  /* End of actual file data */
+
+    .bss : { *(.bss*) *(COMMON) }
+    __stage2_end = .;       /* End including .bss (for memory layout) */
+
+    __stage2_file_end = .;  /* End of actual file data */
+
+    .bss : { *(.bss*) *(COMMON) }
+    __stage2_end = .;       /* End including .bss (for memory layout) */
 
     /* Assert Stage2 does not exceed 0x100000, i.e. doesn't bleed into kernel address space */
-    ASSERT(__stage2_end < 0x100000, "")
+    ASSERT(__stage2_end < 0x100000, "Stage2 exceeds 1MB boundary")
 }

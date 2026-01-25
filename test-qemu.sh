@@ -50,11 +50,11 @@ echo "Extracting Stage 1b (from file offset 0x400)..."
 # Write Stage 1b starting at disk sector 1
 # Stage 1b is at file offset 0x400 (1024 bytes) in ArtInium.16
 # Write it to disk sector 1 (byte offset 512)
-dd if=zig-out/bin/ArtInium.16 of=disk.img bs=1 skip=1024 seek=512 conv=notrunc
+dd if=zig-out/bin/ArtInium.16 of=disk.img bs=512 skip=2 seek=1 conv=notrunc
 
 #echo "Writing Stage 2 (32-bit code) to sector 32..."
 # Write Stage 2 (32-bit code) to sector 32 (64KB offset)
-#dd if=zig-out/bin/ArtInium.32 of=disk.img bs=512 seek=128 conv=notrunc 2>/dev/null
+dd if=zig-out/bin/ArtInium.32 of=disk.img bs=512 skip=0 seek=17 conv=notrunc 2>/dev/null
 
 echo "Disk image created successfully!"
 echo ""
