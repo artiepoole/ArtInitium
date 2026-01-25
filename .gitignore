@@ -3,3 +3,5 @@ sandbox/
 .zig-cache/
 zig-out/
 *.o
+disk.img
+serial.log
