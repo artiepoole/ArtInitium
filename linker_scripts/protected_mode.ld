@@ -4,7 +4,9 @@
  * Copyright (c) ${YEAR} Artie Poole */
 
 OUTPUT_ARCH(i386)
-OUTPUT_FORMAT("binary")
+/*OUTPUT_FORMAT("binary")*/
+
+OUTPUT_FORMAT(elf32-i386)
 ENTRY(Artinium_32_entry)
 
 SECTIONS {

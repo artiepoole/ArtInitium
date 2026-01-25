@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) void {
         }
     });
 
-    const protected_mode = b.addExecutable(.{ .name = "ArtInium.32", .root_module = protected_mode_mod });
+    const protected_mode = b.addExecutable(.{ .name = "ArtInium.32.elf", .root_module = protected_mode_mod });
 
     //custom linker script to load in at 64KB
     protected_mode.linker_script = b.path("linker_scripts/protected_mode.ld");
@@ -35,8 +35,18 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(protected_mode);
 
     // Make this the default build step
-    const step_32 = b.step("ArtInium.32", "Build 32-bit binary");
-    step_32.dependOn(&protected_mode.step);
+    const elf_32 = b.step("ArtInium.32.elf", "Build 32-bit binary");
+    elf_32.dependOn(&protected_mode.step);
+    const objcopy_32 = b.addSystemCommand(&.{
+        "objcopy",
+        "-O", "binary",
+        b.pathJoin(&.{ b.install_path, "bin/ArtInium.32.elf" }),
+        b.pathJoin(&.{ b.install_path, "bin/ArtInium.32" }),
+    });
+    objcopy_32.step.dependOn(&protected_mode.step);
+
+    const step_32 = b.step("ArtInium.32", "Build 32-bit raw binary");
+    step_32.dependOn(&objcopy_32.step);
 
     // ---------------------------------------------------------------
     // Build 16-bit binary
