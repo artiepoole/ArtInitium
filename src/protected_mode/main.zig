@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
 //
+// const std = @import("std");
 const lib = @import("artlib");
 
 const LOAD_MSG: []const u8 = "Loading 32-bit protected mode bootloader...\n";
@@ -26,6 +27,8 @@ pub export fn Artinium_32_entry() linksection(".text.entry") callconv(.c) noretu
     // - Set up paging if needed
     // - Jump to kernel
 
+    lib.serial.Serial.init(lib.cpu.Port.Serial.COM1) catch {};
+    lib.serial.Serial.write(LOAD_MSG);
     // For now, just halt
     while (true) {
         asm volatile ("hlt");
