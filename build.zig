@@ -9,6 +9,33 @@ pub fn build(b: *std.Build) void {
     });
 
     // ---------------------------------------------------------------
+    // Build 16-bit binary
+    // ---------------------------------------------------------------
+
+    // Define the custom AS calls and their output object files
+    const assemble_stage1a = b.addSystemCommand(&.{
+        "as",
+        "--32",
+        "src/real_mode/stage1a.S",
+        "-o",
+    });
+    const assemble_stage1b = b.addSystemCommand(&.{
+        "as",
+        "--32",
+        "src/real_mode/stage1b.S",
+        "-o",
+    });
+    const stage1a_obj = assemble_stage1a.addOutputFileArg("stage1a.o");
+    const stage1b_obj = assemble_stage1b.addOutputFileArg("stage1b.o");
+
+    // Define the executable as a linked target which zig should build - creates automatic output names etc
+    const real_mode_module = b.createModule(.{ .target = i386_target, .optimize = optimise });
+    const real_mode_exe = b.addExecutable(.{ .name = "ArtInium.16", .root_module = real_mode_module });
+    real_mode_exe.setLinkerScript(b.path("linker_scripts/real_mode.ld"));
+    real_mode_exe.addObjectFile(stage1a_obj);
+    real_mode_exe.addObjectFile(stage1b_obj);
+
+    // ---------------------------------------------------------------
     // Build 32-bit binaries
     // ---------------------------------------------------------------
 
@@ -19,11 +46,11 @@ pub fn build(b: *std.Build) void {
     });
 
     // Define the protected mode executable elf file
-    const protected_mode_mod = b.createModule(.{ .root_source_file = b.path("src/protected_mode/main.zig"), .target = i386_target, .optimize = optimise, .imports = &.{.{ .name = "artlib", .module = artlib_mod }} });
-    const protected_mode = b.addExecutable(.{ .name = "ArtInium.32.elf", .root_module = protected_mode_mod });
+    const elf_32_mod = b.createModule(.{ .root_source_file = b.path("src/protected_mode/main.zig"), .target = i386_target, .optimize = optimise, .imports = &.{.{ .name = "artlib", .module = artlib_mod }} });
+    const elf_32_exe = b.addExecutable(.{ .name = "ArtInium.32.elf", .root_module = elf_32_mod });
 
     // use the custom linker script to load in at 64KB
-    protected_mode.linker_script = b.path("linker_scripts/protected_mode.ld");
+    elf_32_exe.linker_script = b.path("linker_scripts/protected_mode.ld");
 
     // Extract the binary executable from the elf for use in the image
     const objcopy_32 = b.addSystemCommand(&.{
@@ -31,43 +58,15 @@ pub fn build(b: *std.Build) void {
         "-O",
         "binary",
     });
-    objcopy_32.addArtifactArg(protected_mode);
-    const binary_32 = objcopy_32.addOutputFileArg("ArtInium.32");
-
-
-    // ---------------------------------------------------------------
-    // Build 16-bit binary
-    // ---------------------------------------------------------------
-
-    // Define the custom AS calls and their output object files
-    const stage1a = b.addSystemCommand(&.{
-        "as",
-        "--32",
-        "src/real_mode/stage1a.S",
-        "-o",
-    });
-    const stage1b = b.addSystemCommand(&.{
-        "as",
-        "--32",
-        "src/real_mode/stage1b.S",
-        "-o",
-    });
-    const stage1a_obj = stage1a.addOutputFileArg("stage1a.o");
-    const stage1b_obj = stage1b.addOutputFileArg("stage1b.o");
-
-    // Define the executable as a linked target which zig should build - creates automatic output names etc
-    const real_mode_module = b.createModule(.{ .target = i386_target, .optimize = optimise });
-    const real_mode = b.addExecutable(.{ .name = "ArtInium.16", .root_module = real_mode_module });
-    real_mode.setLinkerScript(b.path("linker_scripts/real_mode.ld"));
-    real_mode.addObjectFile(stage1a_obj);
-    real_mode.addObjectFile(stage1b_obj);
+    objcopy_32.addArtifactArg(elf_32_exe);
+    const binary_32_output = objcopy_32.addOutputFileArg("ArtInium.32");
 
     // ---------------------------------------------------------------
     // Specify install targets so that files appear in zig-out/bin
     // ---------------------------------------------------------------
-    const install_binary_16 = b.addInstallArtifact(real_mode, .{});
-    const install_elf_32 = b.addInstallArtifact(protected_mode, .{});
-    const install_binary_32 = b.addInstallFile(binary_32, "bin/ArtInium.32");
+    const install_binary_16 = b.addInstallArtifact(real_mode_exe, .{});
+    const install_elf_32 = b.addInstallArtifact(elf_32_exe, .{});
+    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInium.32");
 
     // ---------------------------------------------------------------
     // Define `zig build [target]` targets
