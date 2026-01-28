@@ -6,40 +6,28 @@
 OUTPUT_ARCH(i386)
 OUTPUT_FORMAT("binary")        /* produce a flat binary, not ELF */
 ENTRY(__stage_1a_start)                  /* entry point symbol from boot.s */
+
+MEMORY
+{
+    BOOT : ORIGIN = 0x7C00, LENGTH = 512
+    STAGE1B : ORIGIN = 0x8000, LENGTH = 31K /* Allow 1kb for stack */
+}
+
 SECTIONS
 {
-    /* origin: BIOS loads boot sector at 0x7C00 */
-    . = 0x7C00;
+    .stage1a : ALIGN(1) {
+        KEEP(*(.stage1a*))
+    } > BOOT
 
-    .stage1a : {
-        *(.stage1a*)
-    }
-    ASSERT(. <= 0x7C00 + 512, "Stage1a too large! Exceeds 512B limit")
+    .stage1b : AT(.)  {
+        KEEP(*(.stage1b.code*))
+        KEEP(*(.stage1b.data*))
+    } > STAGE1B
 
+    __stage1b_start = 0x8000;
+    __stage1b_end = __stage1b_start + SIZEOF(.stage1b);
 
-    . = 0x8000;                 /* 32 KB */
-    __stage1b_start = .;
+    /* compute sectors as a constant */
+    STAGE1B_SECTORS = (__stage1b_end - __stage1b_start + 511)/512;
 
-    .stage1b.code : {
-        *(.stage1b.code*)
-    }
-    __stage1b_code_end = .;
-
-    . = ALIGN(512);
-    __stage1b_data_start = .;
-
-    .stage1b.data : {
-        *(.stage1b.data*)
-    }
-    __stage1b_data_end = .;
-
-    __stage1b_end = .;
-    __stage1b_size = __stage1b_end - __stage1b_start;
-    STAGE1B_SECTORS = (__stage1b_size + 511)/512;
-
-    /* Stack configuration */
-    __stack_top = 0x9FFF;
-
-    /* Assertions */
-    ASSERT(__stage1b_end <= (__stack_top-512), "Stage1b too large! Overlaps with stack")
 }

@@ -13,19 +13,18 @@ Load addresses
 stage1a memory map
 ---
 
-| Addr range      | Description       | size          | notes                                       |
-|-----------------|-------------------|---------------|---------------------------------------------|
-| 0x7C00 - 0x7DFE | entry, code, data | 510 B         | Max size asserted at link time              |
-| 0x7DFE - 0x7E00 | boot magic        | 2 B           | 0xAA55 - BIOS boot magic                    | 
-| 0x7E00          | stage1a stack pointer (grows down) | - | Initial SP value                            |
-| 0x7E00 - 0x8000 | Free memory (used by stack)        | 512 B | Stack grows downward from 0x7E00     |
+| Addr range      | Description                        | size  | notes                            |
+|-----------------|------------------------------------|-------|----------------------------------|
+| 0x7C00 - 0x7DFE | entry, code, data                  | 510 B | Max size asserted at link time   |
+| 0x7DFE - 0x7E00 | boot magic                         | 2 B   | 0xAA55 - BIOS boot magic         | 
+| 0x7E00          | stage1a stack pointer (grows down) | -     | Initial SP value                 |
+| 0x7E00 - 0x8000 | Free memory (used by stack)        | 512 B | Stack grows downward from 0x7E00 |
 
 stage1b memory map
 ---
 
-| Addr range      | Description                              | size           | notes                                     |
-|-----------------|------------------------------------------|----------------|-------------------------------------------|
-| 0x8000 - 0x9000 | stage1b code + data                      | 0x1000:  4 KB  | Code, strings, boot info, VBE data, memory map. Max size asserted at link time |
-| 0x9000 - 0xFFFF | Free memory (used by stack)              | 0x6FFF: ~28 KB | Stack grows downward from 0xFFFF          |
-| 0xFFFF          | stage1b stack pointer (grows down)       | -              | Initial SP value                          |
-| 0x10000+        | Stage 2 (32-bit protected mode code)     | ...            | Loaded after stage1b completes            |
+| Addr range    | Description                          | size           | notes                                                                          |
+|---------------|--------------------------------------|----------------|--------------------------------------------------------------------------------|
+| 0x8000 - FC00 | stage1b code + data                  | 0x1000:  31 KB | Code, strings, boot info, VBE data, memory map. Max size asserted at link time |
+| 0xFFFF        | stage1b stack pointer (grows down)   | at least 1 KB  | Stack grows downwards                                                          |
+| 0x10000+      | Stage 2 (32-bit protected mode code) | ...            | Loaded after stage1b completes                                                 |
