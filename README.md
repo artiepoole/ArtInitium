@@ -94,6 +94,11 @@ Press `Ctrl+A` then `X` to exit QEMU.
 MIT License - See LICENSE file
 
 
+# Necessary image file structure:
+0-512 : stage1a (MBR boot sector)
+512-xxxx : stage1b (extended real mode)
+xxxx-end : stage2 (32-bit protected mode)
+
 # docs
 
 VGA docs:

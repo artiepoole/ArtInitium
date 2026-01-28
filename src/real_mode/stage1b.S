@@ -7,6 +7,9 @@
 .code16
 .global stage1b_entry
 
+.extern STAGE1B_SECTORS
+.word STAGE1B_SECTORS
+
 /* -------------------------------------------------
  * Stage1b Entry Point (Stage 1a jumps here)
  * ------------------------------------------------- */
@@ -184,6 +187,10 @@ load_stage2_header:
     mov $stage2_load_msg, %si
     call print_string
 
+    mov $STAGE1B_SECTORS, %ax
+    add $0x1, %ax               /* stage2 first sector = STAGE1B_SECTORS + BOOT_SECTORS (=1)*/
+    mov %ax, stage2_dap + 8  /* starting LBA = STAGE1B_SECTORS */
+
     /* Load sector 17 (header) into 0x10000 using INT 13h Extended Read */
     mov $0x42, %ah            /* INT 13h extended read */
     mov $0x80, %dl            /* boot drive */
@@ -234,7 +241,8 @@ load_full_stage2:
 
     /* Store total sector count */
     mov %ax, %cx              /* CX = total sectors remaining */
-    mov $17, %bx              /* BX = current LBA (starting at sector 17) */
+    mov $STAGE1B_SECTORS, %bx              /* BX = current LBA, start after stage1b */
+    add $0x1, %bx              /* Stage2 starts at sector STAGE1B_SECTORS + BOOT_SECTORS (=1) */
     mov $0x1000, %di          /* DI = current segment (0x1000 = 0x10000) */
 
 .load_loop:
@@ -506,7 +514,7 @@ stage2_dap:
     .word 1               /* number of sectors (will be updated dynamically) */
     .word 0x0000          /* offset (0x10000 = 0x1000:0x0000) */
     .word 0x1000          /* segment */
-    .quad 17              /* starting LBA (sector 17) */
+    .quad 0              /* starting LBA */
 
 /* -------------------------------------------------
  * Memory buffers
