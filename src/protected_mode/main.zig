@@ -19,7 +19,7 @@ fn halt() noreturn {
     }
 }
 
-pub export fn Artinium_32_entry(bios_info_struct: *bios.BiosInfo) linksection(".text.entry") callconv(.c) noreturn {
+pub export fn Artinium_32_entry(bios_info_struct: *bios.BiosInfoHeader) linksection(".text.entry") callconv(.c) noreturn {
     // Write magic marker to VGA memory to verify we got here
     // VGA text mode buffer at 0xB8000
     asm volatile (
