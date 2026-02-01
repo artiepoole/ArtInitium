@@ -45,50 +45,48 @@ pub const Debug = struct {
     }
 
     pub fn print(comptime fmt: []const u8, args: anytype) !void {
-        // var buffer_writer = BufferedWriter{};
-        // try std.fmt.format(buffer_writer.writer(), fmt, args);
-        // try buffer_writer.flush();
-        const formatted = try std.fmt.bufPrint(&print_buffer, fmt, args);
-        try write(formatted);
+        var buffer_writer = BufferedWriter{};
+        try std.fmt.format(buffer_writer.writer(), fmt, args);
+        try buffer_writer.flush();
 
     }
 
-    // const BufferedWriter = struct {
-    //     pos: usize = 0,
-    //
-    //     pub fn writer(self: *BufferedWriter) std.io.GenericWriter(
-    //         *BufferedWriter,
-    //         error{WriteFailed},
-    //         writeInternal,
-    //     ) {
-    //         return .{ .context = self };
-    //     }
-    //
-    //     fn writeInternal(self: *BufferedWriter, data: []const u8) error{WriteFailed}!usize {
-    //         var written: usize = 0;
-    //         while (written < data.len) {
-    //             const available = print_buffer.len - self.pos;
-    //             const to_copy = @min(available, data.len - written);
-    //
-    //             @memcpy(print_buffer[self.pos..][0..to_copy], data[written..][0..to_copy]);
-    //             self.pos += to_copy;
-    //             written += to_copy;
-    //
-    //             if (self.pos >= print_buffer.len) {
-    //                 write(print_buffer[0..self.pos]) catch return error.WriteFailed;
-    //                 self.pos = 0;
-    //             }
-    //         }
-    //         return written;
-    //     }
-    //
-    //     fn flush(self: *BufferedWriter) !void {
-    //         if (self.pos > 0) {
-    //             try write(print_buffer[0..self.pos]);
-    //             self.pos = 0;
-    //         }
-    //     }
-    // };
+    const BufferedWriter = struct {
+        pos: usize = 0,
+
+        pub fn writer(self: *BufferedWriter) std.io.GenericWriter(
+            *BufferedWriter,
+            error{WriteFailed},
+            writeInternal,
+        ) {
+            return .{ .context = self };
+        }
+
+        fn writeInternal(self: *BufferedWriter, data: []const u8) error{WriteFailed}!usize {
+            var written: usize = 0;
+            while (written < data.len) {
+                const available = print_buffer.len - self.pos;
+                const to_copy = @min(available, data.len - written);
+
+                @memcpy(print_buffer[self.pos..][0..to_copy], data[written..][0..to_copy]);
+                self.pos += to_copy;
+                written += to_copy;
+
+                if (self.pos >= print_buffer.len) {
+                    write(print_buffer[0..self.pos]) catch return error.WriteFailed;
+                    self.pos = 0;
+                }
+            }
+            return written;
+        }
+
+        fn flush(self: *BufferedWriter) !void {
+            if (self.pos > 0) {
+                try write(print_buffer[0..self.pos]);
+                self.pos = 0;
+            }
+        }
+    };
 };
 
 test "test long write" {
