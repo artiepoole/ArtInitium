@@ -6,6 +6,7 @@
 //
 const std = @import("std");
 const serial = @import("serial.zig");
+const buffered_list = @import("mem/buffered_list.zig");
 
 const WriterType = std.io.AnyWriter;
 
@@ -14,24 +15,21 @@ pub const Debug = struct {
     var print_buffer: [1024]u8 = [_]u8{0} ** 1024;
     // var writer_buffer: [8]WriterType = undefined;
     // var writers = std.ArrayListUnmanaged(WriterType).initBuffer(&writer_buffer);
+    var writers = buffered_list.BufferedList(WriterType, 8){};
 
-    var writer_buffer: [8*@sizeOf(WriterType) + 128]u8 = undefined; // for overheads
-    var writer_fba: std.heap.FixedBufferAllocator = undefined;
-    var writers = std.ArrayListUnmanaged(WriterType){};
     var initialized: bool = false;
 
-    fn init() void {
-        @memset(writer_buffer[0..], 0);
-        writer_fba = std.heap.FixedBufferAllocator.init(&writer_buffer);
+    fn init() !void {
+        writers.init();
         initialized = true;
     }
 
     pub fn register_writer(new_writer: WriterType) !void {
         if (!initialized) {
-            init();
+            try init();
         }
 
-        if (writers.append(writer_fba.allocator(), new_writer)) |_| {
+        if (writers.append(new_writer)) |_| {
             return;
         } else |err| {
             return err;
@@ -39,7 +37,7 @@ pub const Debug = struct {
     }
 
     pub fn write(data: []const u8) !void {
-        for (writers.items) |writer| {
+        for (writers.items()) |writer| {
             _ = try writer.write(data);
         }
     }
@@ -48,7 +46,6 @@ pub const Debug = struct {
         var buffer_writer = BufferedWriter{};
         try std.fmt.format(buffer_writer.writer(), fmt, args);
         try buffer_writer.flush();
-
     }
 
     const BufferedWriter = struct {
