@@ -2,16 +2,19 @@
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
+
+const std = @import("std");
 const cpu = @import("cpu.zig");
+const debug = @import("debug.zig");
 
 
 const SerialError = error{
-InitFailed,
-UnsupportedHardware,
+    InitFailed,
+    UnsupportedHardware,
 };
 
-
 pub const Serial = struct {
+    var initailized: bool = false;
     var _port: u16 = undefined;
     pub fn init(port: u16) !void {
         _port = port;
@@ -34,12 +37,37 @@ pub const Serial = struct {
 
         // exit loopback
         cpu.outb(port + 4, 0x0F);
-
+        initailized = true;
+        debug.Debug.register_writer(Serial.writer().any()) catch {
+            writeBytes("Serial port registration failed\n");
+        };
     }
-    pub fn write(data: []const u8) void {
+
+    pub fn writeBytes(data: []const u8) void {
+        if (!initailized) {
+            return;
+        }
         for (data) |byte| {
             cpu.outb(_port, byte);
         }
     }
-};
 
+    fn writeBytesFn(context: void, bytes: []const u8) error{}!usize {
+        _ = context;
+        if (!initailized) {
+            return 0;
+        }
+        for (bytes) |byte| {
+            cpu.outb(_port, byte);
+        }
+        return bytes.len;
+    }
+
+    pub fn writer() std.io.GenericWriter(void, error{}, writeBytesFn) {
+        return .{ .context = {} };
+    }
+
+    pub fn write(data: []const u8) !void {
+        _ = writeBytes( data) catch {};
+    }
+};

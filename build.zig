@@ -91,4 +91,10 @@ pub fn build(b: *std.Build) void {
     build_all.dependOn(elf_32);
     build_all.dependOn(step_32);
     build_all.dependOn(b.getInstallStep());
+
+    const clean_step = b.addRemoveDirTree(b.path("zig-out"));
+    const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
+    const clean = b.step("clean", "Remove build outputs");
+    clean.dependOn(&clean_step.step);
+    clean.dependOn(&clean_cache.step);
 }

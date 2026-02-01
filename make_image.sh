@@ -68,8 +68,8 @@ stage2_seek=$(( 1 + stage1b_sectors ))
 dd if=$stage2_file of=disk.img bs=512 skip=0 seek=$stage2_seek conv=notrunc 2>/dev/null
 
 
-echo "Disk image created successfully!"
-echo ""
-echo "Launching QEMU..."
-
-qemu-system-i386 -drive file=disk.img,format=raw -serial file:serial.log -s -S -m 2G -no-reboot -no-shutdown #-d int
+# echo "Disk image created successfully!"
+# echo ""
+# echo "Launching QEMU..."
+#
+# qemu-system-i386 -drive file=disk.img,format=raw -serial file:serial.log -s -S -m 2G -no-reboot -no-shutdown #-d int

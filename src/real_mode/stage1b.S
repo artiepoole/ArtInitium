@@ -149,7 +149,7 @@ get_vga_info:
  * Prepare Boot Info Structure for Stage 2
  * ------------------------------------------------- */
 prepare_boot_info:
-    mov $boot_info_struct, %di
+    mov $bios_info_struct, %di
 
     /* Set magic number "ARTI" = 0x41525449 */
     movl $0x41525449, %es:(%di)
@@ -407,8 +407,8 @@ protected_mode_entry:
 
     /* Jump to Stage 2 at 0x10010 (skip 8-byte header + 8-byte padding) */
     /* Using indirect call through memory to ensure 32-bit addressing */
-    pushl $0x10010
-    ret
+    push $bios_info_struct
+    call 0x10010
 
     /* Should never reach here */
     mov $load_fail_msg, %si
@@ -521,8 +521,8 @@ stage2_dap:
  * ------------------------------------------------- */
 .align 4
 
-/* Boot Info Structure for Stage 2 (at 0x8500) */
-boot_info_struct:
+/* Boot Info Structure for Stage 2 */
+bios_info_struct:
     .skip 96              /* BootInfo structure + padding */
 
 vbe_info_block:
