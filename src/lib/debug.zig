@@ -15,19 +15,27 @@ pub const Debug = struct {
     // var writer_buffer: [8]WriterType = undefined;
     // var writers = std.ArrayListUnmanaged(WriterType).initBuffer(&writer_buffer);
 
-    var writer_buffer: [8 * @sizeOf(WriterType)]u8 = undefined;
+    var writer_buffer: [8*@sizeOf(WriterType) + 128]u8 = undefined; // for overheads
     var writer_fba: std.heap.FixedBufferAllocator = undefined;
     var writers = std.ArrayListUnmanaged(WriterType){};
     var initialized: bool = false;
 
     fn init() void {
+        @memset(writer_buffer[0..], 0);
         writer_fba = std.heap.FixedBufferAllocator.init(&writer_buffer);
         initialized = true;
     }
 
     pub fn register_writer(new_writer: WriterType) !void {
-        if (!initialized) init();
-        try writers.append(writer_fba.allocator(), new_writer);
+        if (!initialized) {
+            init();
+        }
+
+        if (writers.append(writer_fba.allocator(), new_writer)) |_| {
+            return;
+        } else |err| {
+            return err;
+        }
     }
 
     pub fn write(data: []const u8) !void {
@@ -37,31 +45,50 @@ pub const Debug = struct {
     }
 
     pub fn print(comptime fmt: []const u8, args: anytype) !void {
-        var buffer_offset: usize = 0;
+        // var buffer_writer = BufferedWriter{};
+        // try std.fmt.format(buffer_writer.writer(), fmt, args);
+        // try buffer_writer.flush();
+        const formatted = try std.fmt.bufPrint(&print_buffer, fmt, args);
+        try write(formatted);
 
-        while (buffer_offset < print_buffer.len) {
-            const remaining_buffer = print_buffer[buffer_offset..];
-            const formatted = std.fmt.bufPrint(remaining_buffer, fmt, args) catch |fmt_err| {
-                if (fmt_err == error.NoSpaceLeft) {
-                    // Write what we have so far
-                    write(print_buffer[0..print_buffer.len]) catch |prnt_err| {
-                        return prnt_err;
-                    };
-                    // serial.Serial.write(print_buffer[0..print_buffer.len]);
-                    buffer_offset = 0;
-                    continue;
-                } else {
-                    return fmt_err;
-                }
-            };
-
-            // Successfully formatted, write it
-            // serial.Serial.write(formatted);
-            write(formatted) catch |prnt_err| {
-                return prnt_err;
-            };
-        }
     }
+
+    // const BufferedWriter = struct {
+    //     pos: usize = 0,
+    //
+    //     pub fn writer(self: *BufferedWriter) std.io.GenericWriter(
+    //         *BufferedWriter,
+    //         error{WriteFailed},
+    //         writeInternal,
+    //     ) {
+    //         return .{ .context = self };
+    //     }
+    //
+    //     fn writeInternal(self: *BufferedWriter, data: []const u8) error{WriteFailed}!usize {
+    //         var written: usize = 0;
+    //         while (written < data.len) {
+    //             const available = print_buffer.len - self.pos;
+    //             const to_copy = @min(available, data.len - written);
+    //
+    //             @memcpy(print_buffer[self.pos..][0..to_copy], data[written..][0..to_copy]);
+    //             self.pos += to_copy;
+    //             written += to_copy;
+    //
+    //             if (self.pos >= print_buffer.len) {
+    //                 write(print_buffer[0..self.pos]) catch return error.WriteFailed;
+    //                 self.pos = 0;
+    //             }
+    //         }
+    //         return written;
+    //     }
+    //
+    //     fn flush(self: *BufferedWriter) !void {
+    //         if (self.pos > 0) {
+    //             try write(print_buffer[0..self.pos]);
+    //             self.pos = 0;
+    //         }
+    //     }
+    // };
 };
 
 test "test long write" {
