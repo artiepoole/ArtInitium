@@ -23,8 +23,16 @@ stage1a memory map
 stage1b memory map
 ---
 
-| Addr range    | Description                          | size           | notes                                                                          |
-|---------------|--------------------------------------|----------------|--------------------------------------------------------------------------------|
-| 0x8000 - FC00 | stage1b code + data                  | 0x1000:  31 KB | Code, strings, boot info, VBE data, memory map. Max size asserted at link time |
-| 0xFFFF        | stage1b stack pointer (grows down)   | at least 1 KB  | Stack grows downwards                                                          |
-| 0x10000+      | Stage 2 (32-bit protected mode code) | ...            | Loaded after stage1b completes                                                 |
+| Addr range      | Description                          | size           | notes                                                                          |
+|-----------------|--------------------------------------|----------------|--------------------------------------------------------------------------------|
+| 0x8000 - 0xFC00 | stage1b code + data                  | 0x1000:  31 KB | Code, strings, boot info, VBE data, memory map. Max size asserted at link time |
+| 0xFFFF          | stage1b stack pointer (grows down)   | at least 1 KB  | Stack grows downwards                                                          |
+| 0x10000+        | Stage 2 (32-bit protected mode code) | ...            | Loaded after stage1b completes                                                 |
+
+stage2 memory map
+---
+
+| Addr range        | Description        | size  | notes                                       |
+|-------------------|--------------------|-------|---------------------------------------------|
+| 0x10000 - 0x9fc00 | stage2 code + data | 64 KB | Code, data, boot info, VBE handling         |
+| 0x100000          | Kernel load area   | >1 MB | Kernel loaded here after stage2 initializes |     

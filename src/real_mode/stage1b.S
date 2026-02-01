@@ -403,8 +403,8 @@ protected_mode_entry:
     mov %ax, %gs
     mov %ax, %ss
 
-    mov $0x9FFF, %esp     /* stack at 0x9FFF (matches real mode, see linker script) */
-
+    mov $0x9FFF, %esp     /* stack at 0x9fc00, end of usable address space */
+    mov $0x9fc00, %esp
     /* Jump to Stage 2 at 0x10010 (skip 8-byte header + 8-byte padding) */
     /* Using indirect call through memory to ensure 32-bit addressing */
     push $bios_info_struct
@@ -519,16 +519,18 @@ stage2_dap:
 /* -------------------------------------------------
  * Memory buffers
  * ------------------------------------------------- */
-.align 4
 
 /* Boot Info Structure for Stage 2 */
+.align 4
 bios_info_struct:
     .skip 96              /* BootInfo structure + padding */
 
+.align 4
 vbe_info_block:
     .skip 512
 
 /* List of VBE modes to query */
+.align 4
 vbe_mode_list:
     .word 0x0117          /* 1024x768x16 */
     .word 0x0118          /* 1024x768x24 */
@@ -541,19 +543,24 @@ vbe_mode_list:
     .word 0xFFFF          /* terminator */
 
 /* Storage for mode info blocks (256 bytes each, 8 modes max) */
+.align 4
 vbe_modes_info:
     .skip 2048            /* 256 * 8 modes */
 
+.align 4
 vbe_mode_count:
     .word 0
 
 /* Legacy single mode info block - kept for compatibility */
+.align 4
 mode_info_block:
     .skip 256
 
+.align 4
 memory_map:
     .skip 768             /* 32 entries * 24 bytes */
 
+.align 4
 memory_map_count:
     .word 0
 

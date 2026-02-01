@@ -14,60 +14,80 @@ const SerialError = error{
 };
 
 pub const Serial = struct {
-    var initailized: bool = false;
-    var _port: u16 = undefined;
-    pub fn init(port: u16) !void {
-        _port = port;
+    initialised: bool = false,
+    com: cpu.COM,
 
-        cpu.outb(port + 1, 0x00); // disable interrupts
-        cpu.outb(port + 3, 0x80); // enable DLAB
-        cpu.outb(port + 0, 0x03); // divisor low (38400 baud)
-        cpu.outb(port + 1, 0x00); // divisor high
-        cpu.outb(port + 3, 0x03); // 8N1
-        cpu.outb(port + 2, 0xC7); // FIFO
-        cpu.outb(port + 4, 0x0B); // IRQs, RTS/DSR
+    var instances: [4]?*Serial = [_]?*Serial{null} ** 4;
+    var storage: [4]Serial = undefined;  // Backing storage
+
+    pub fn get(comptime port_base: u16) !*Serial {
+        // Map port base address to array index
+        const com_index: u3 = switch (port_base) {
+            0x3F8 => 0, // COM1
+            0x2F8 => 1, // COM2
+            0x3E8 => 2, // COM3
+            0x2E8 => 3, // COM4
+            else => return error.UnsupportedHardware,
+        };
+
+        if (instances[com_index] == null) {
+            storage[com_index] = Serial{
+                .initialised = false,
+                .com = cpu.COM.init(port_base),
+            };
+            instances[com_index] = &storage[com_index];
+            try instances[com_index].?.initInternal();
+        }
+        return instances[com_index].?;
+    }
+
+    fn initInternal(self: *Serial) !void {
+        self.com.IER.outb(0x00); // disable interrupts
+        self.com.LCR.outb(0x80); // enable DLAB
+        self.com.DATA.outb(0x03); // divisor low (38400 baud)
+        self.com.IER.outb(0x00); // divisor high
+        self.com.LCR.outb(0x03); // 8N1
+        self.com.IIR.outb(0xC7); // FIFO
+        self.com.MCR.outb(0x0B); // IRQs, RTS/DSR
 
         // loopback test
-        cpu.outb(port + 4, 0x1E);
-        cpu.outb(port + 0, 0xAE);
+        self.com.MCR.outb(0x1E);
+        self.com.DATA.outb(0xAE);
 
-        if (cpu.inb(port + 0) != 0xAE) {
-            return error.InitFailed; // UART not present
+        if (self.com.DATA.inb() != 0xAE) {
+            return error.InitFailed;
         }
 
         // exit loopback
-        cpu.outb(port + 4, 0x0F);
-        initailized = true;
-        debug.Debug.register_writer(Serial.writer().any()) catch {
-            writeBytes("Serial port registration failed\n");
+        self.com.MCR.outb(0x0F);
+        self.initialised = true;
+        self.com.DATA.outb('x'); // test byte
+
+        debug.Debug.register_writer(self.writer().any()) catch {
+            self.writeBytes("Serial port registration failed\n");
         };
     }
 
-    pub fn writeBytes(data: []const u8) void {
-        if (!initailized) {
+    pub fn writeBytes(self: *Serial,data: []const u8) void {
+        if (!self.initialised) {
             return;
         }
         for (data) |byte| {
-            cpu.outb(_port, byte);
+            self.com.DATA.outb(byte);
         }
     }
 
-    fn writeBytesFn(context: void, bytes: []const u8) error{}!usize {
-        _ = context;
-        if (!initailized) {
+    fn writeBytesFn(context: *Serial, bytes: []const u8) error{}!usize {
+        if (!context.initialised) {
             return 0;
         }
         for (bytes) |byte| {
-            cpu.outb(_port, byte);
+            context.com.DATA.outb(byte);
         }
         return bytes.len;
     }
 
-    pub fn writer() std.io.GenericWriter(void, error{}, writeBytesFn) {
-        return .{ .context = {} };
-    }
-
-    pub fn write(data: []const u8) !void {
-        _ = writeBytes( data) catch {};
+    pub fn writer(self: *Serial) std.io.GenericWriter(*Serial, error{}, writeBytesFn) {
+        return .{ .context = self };
     }
 };
