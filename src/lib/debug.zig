@@ -60,7 +60,6 @@ pub const Debug = struct {
             write(formatted) catch |prnt_err| {
                 return prnt_err;
             };
-            break;
         }
     }
 };
@@ -74,6 +73,7 @@ test "test long write" {
     defer Debug.writers.clearRetainingCapacity();
 
     const very_long_string = "A" ** 2000;
+    // @breakpoint();
     try Debug.print("Test: {s}", .{very_long_string});
 
     try std.testing.expect(fbs.pos == very_long_string.len + 6); // "Test: " + content

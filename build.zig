@@ -97,4 +97,26 @@ pub fn build(b: *std.Build) void {
     const clean = b.step("clean", "Remove build outputs");
     clean.dependOn(&clean_step.step);
     clean.dependOn(&clean_cache.step);
+
+
+    // ---------------------------------------------------------------
+    // Create test target to run library Unit tests on host
+    // ---------------------------------------------------------------
+    const host_target = b.standardTargetOptions(.{});
+    const artlib_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/lib/root.zig"),
+        .target = host_target,
+    });
+
+    const mod_tests = b.addTest(.{
+        .root_module = artlib_test_mod,
+        .use_llvm = true,
+        .use_lld = true,
+    });
+
+    const install_mod_tests = b.addInstallArtifact(mod_tests, .{ .dest_dir = .{ .override = .{ .custom = "test_artlib" } } });
+
+    const mod_tests_step = b.step("test_artlib", "Create test binaries for debugging 'root'");
+    mod_tests_step.dependOn(&install_mod_tests.step);
+
 }
