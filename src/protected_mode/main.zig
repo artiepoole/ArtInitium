@@ -7,8 +7,9 @@ const std = @import("std");
 const cpu = @import("artlib").cpu;
 const serial = @import("artlib").serial;
 const bios = @import("artlib").bios;
-const debug = @import("artlib").debug;
+const log = @import("artlib").log;
 const video = @import("artlib").video;
+const terminal = @import("artlib").terminal;
 
 const LOAD_MSG: []const u8 = "Loading 32-bit protected mode bootloader...\n";
 const BIOS_INVALID_MSG: []const u8 = "Invalid BIOS boot info\n";
@@ -29,22 +30,28 @@ pub export fn Artinium_32_entry(bios_info_struct: *bios.header.BiosInfoHeader) l
 
     const com1 = serial.Serial.get(cpu.port_ids.Serial.COM1) catch {
         halt();
-    }; // Initialize COM1 - file logging
+    }; // Initialize COM1 - qemu file logging - serial.log
+    log.Logger.register_writer(com1.Writer(), "com1", log.LoggerLevel.Trace) catch {
+        halt();
+    };
     const com2 = serial.Serial.get(cpu.port_ids.Serial.COM2) catch {
         halt();
-    }; // Initialize COM1 - file logging
-    debug.Debug.register_writer(com1.Writer(), "com1") catch {
+    }; // Initialize COM2 - qemu stdio logging
+    log.Logger.register_writer(com2.Writer(), "com2", log.LoggerLevel.Debug) catch {
         halt();
     };
-    debug.Debug.register_writer(com2.Writer(), "com2") catch {
+
+
+    log.Logger.register_writer(terminal.Terminal.writer(), "terminal", log.LoggerLevel.Info) catch {
         halt();
     };
-    debug.Debug.print(LOAD_MSG, .{}) catch {
+
+    log.Logger.print(LOAD_MSG, .{}) catch {
         halt();
     };
 
     bios.parse_bios_headers(bios_info_struct) catch {
-        debug.Debug.print(BIOS_INVALID_MSG, .{}) catch {
+        log.Logger.print(BIOS_INVALID_MSG, .{}) catch {
             halt();
         };
         halt();

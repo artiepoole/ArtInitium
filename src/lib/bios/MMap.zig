@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
 
-const debug = @import("../debug.zig");
+const log = @import("../log.zig");
 
 pub const MMapEntry = extern struct {
     base_addr: u64,
@@ -22,22 +22,22 @@ pub fn parse_mmap_entries(mmap_ptr: u32, mmap_count: u16) !void {
     for (entries, 0..) |entry, i| {
         switch (entry.entry_type) {
             1 => |_| {
-                try debug.Debug.print("MMap Entry {d}: Usable Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
+                try log.Logger.debug("MMap Entry {d}: Usable Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
             },
             2 => |_| {
-                try debug.Debug.print("MMap Entry {d}: Reserved Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
+                try log.Logger.debug("MMap Entry {d}: Reserved Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
             },
             3 => |_| {
-                try debug.Debug.print("MMap Entry {d}: ACPI Reclaimable Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
+                try log.Logger.debug("MMap Entry {d}: ACPI Reclaimable Memory - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
             },
             4 => |_| {
-                try debug.Debug.print("MMap Entry {d}: Non Volatile Storage - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
+                try log.Logger.debug("MMap Entry {d}: Non Volatile Storage - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
             },
             5 => |_| {
-                try debug.Debug.print("MMap Entry {d}: Bad RAM area - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
+                try log.Logger.debug("MMap Entry {d}: Bad RAM area - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.base_addr, entry.length });
             },
             else => |_| {
-                try debug.Debug.print("ERROR: MMap Entry {d}: Unknown Type {d} - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.entry_type, entry.base_addr, entry.length });
+                try log.Logger.debug("ERROR: MMap Entry {d}: Unknown Type {d} - Base: 0x{x}, Length: 0x{x}\n", .{ i, entry.entry_type, entry.base_addr, entry.length });
                 return error.MMAPEntryUnknownType;
             },
         }

@@ -5,7 +5,6 @@
 
 const std = @import("std");
 const cpu = @import("cpu.zig");
-const debug = @import("debug.zig");
 
 
 const SerialError = error{
