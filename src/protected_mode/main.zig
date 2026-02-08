@@ -27,17 +27,28 @@ pub export fn Artinium_32_entry(bios_info_struct: *bios.header.BiosInfoHeader) l
     // - Set up paging if needed
     // - Jump to kernel
 
-    const com1 = serial.Serial.get_com1() catch {halt();}; // Initialize COM1
-    debug.Debug.register_writer(com1.Writer(), "com1") catch {halt();};
-    debug.Debug.print(LOAD_MSG, .{}) catch {halt();};
-
-    bios.parse_bios_headers(bios_info_struct) catch {
-        debug.Debug.print(BIOS_INVALID_MSG, .{}) catch {halt();};
+    const com1 = serial.Serial.get(cpu.port_ids.Serial.COM1) catch {
+        halt();
+    }; // Initialize COM1 - file logging
+    const com2 = serial.Serial.get(cpu.port_ids.Serial.COM2) catch {
+        halt();
+    }; // Initialize COM1 - file logging
+    debug.Debug.register_writer(com1.Writer(), "com1") catch {
+        halt();
+    };
+    debug.Debug.register_writer(com2.Writer(), "com2") catch {
+        halt();
+    };
+    debug.Debug.print(LOAD_MSG, .{}) catch {
         halt();
     };
 
+    bios.parse_bios_headers(bios_info_struct) catch {
+        debug.Debug.print(BIOS_INVALID_MSG, .{}) catch {
+            halt();
+        };
+        halt();
+    };
 
     halt();
 }
-
-

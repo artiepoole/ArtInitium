@@ -12,21 +12,33 @@ const SerialError = error{
     InitFailed,
     UnsupportedHardware,
 };
+
+var coms: [4]Serial = .{
+    Serial{ .com = cpu.COM.init(cpu.port_ids.Serial.COM1) },
+    Serial{ .com = cpu.COM.init(cpu.port_ids.Serial.COM2) },
+    Serial{ .com = cpu.COM.init(cpu.port_ids.Serial.COM3) },
+    Serial{ .com = cpu.COM.init(cpu.port_ids.Serial.COM4) },
+};
+
 pub const Serial = struct {
     initialised: bool = false,
     com: cpu.COM,
 
-    // Static singleton instance for COM1
-    var com1_instance: Serial = Serial{
-        .initialised = false,
-        .com = cpu.COM.init(0x3F8),
-    };
-
-    pub fn get_com1() !*Serial {
-        if (!com1_instance.initialised){
-            try com1_instance.initInternal();
+    /// call with "cpu.port_ids.Serial.COMX" to get the corresponding instance
+    /// where X = 1..4
+    pub fn get(port: u16) !*Serial {
+        const idx: usize = switch (port) {
+            cpu.port_ids.Serial.COM1 => 0,
+            cpu.port_ids.Serial.COM2 => 1,
+            cpu.port_ids.Serial.COM3 => 2,
+            cpu.port_ids.Serial.COM4 => 3,
+            else => return error.UnsupportedHardware,
+        };
+        const serial = &coms[idx];
+        if (!serial.initialised) {
+            try serial.initInternal();
         }
-        return &com1_instance;
+        return serial;
     }
 
     fn initInternal(self: *Serial) !void {
