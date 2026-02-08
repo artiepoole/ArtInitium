@@ -33,6 +33,9 @@ pub const port_ids = enum {
     /// Serial ports (COM1)
     pub const Serial = enum {
         pub const COM1 = 0x3f8;
+        pub const COM2 = 0x2f8;
+        pub const COM3 = 0x3e8;
+        pub const COM4 = 0x2e8;
     };
 
     pub const BGA = enum {

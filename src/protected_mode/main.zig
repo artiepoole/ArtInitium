@@ -21,23 +21,14 @@ fn halt() noreturn {
 }
 
 pub export fn Artinium_32_entry(bios_info_struct: *bios.header.BiosInfoHeader) linksection(".text.entry") callconv(.c) noreturn {
-    // Write magic marker to VGA memory to verify we got here
-    // VGA text mode buffer at 0xB8000
-    asm volatile (
-        \\ mov $0xB8000, %%edi
-        \\ movw $0x4F32, (%%edi)
-        \\ movw $0x0F32, (%edi)    /* '2' white on black */
-        \\ movw $0x0F33, 2(%edi)   /* '3' white on black */
-        \\ movw $0x0F34, 4(%edi)   /* '4' white on black */
-        ::: .{ .edi = true });
-
     // TODO: implement Stage 2 bootloader
     // - Load kernel from disk
     // - Parse kernel headers
     // - Set up paging if needed
     // - Jump to kernel
 
-    serial.Serial.get(cpu.port_ids.Serial.COM1) catch {halt();}; // Initialize COM1
+    const com1 = serial.Serial.get_com1() catch {halt();}; // Initialize COM1
+    debug.Debug.register_writer(com1.Writer(), "com1") catch {halt();};
     debug.Debug.print(LOAD_MSG, .{}) catch {halt();};
 
     bios.parse_bios_headers(bios_info_struct) catch {

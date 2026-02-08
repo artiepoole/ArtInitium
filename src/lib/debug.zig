@@ -24,12 +24,13 @@ pub const Debug = struct {
         initialized = true;
     }
 
-    pub fn register_writer(new_writer: WriterType) !void {
+    pub fn register_writer(new_writer: WriterType, name:[]const u8) !void {
         if (!initialized) {
             try init();
         }
 
         if (writers.append(new_writer)) |_| {
+            try print("Debug: Registered new writer: {s}\n", .{name});
             return;
         } else |err| {
             return err;

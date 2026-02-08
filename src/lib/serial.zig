@@ -12,33 +12,21 @@ const SerialError = error{
     InitFailed,
     UnsupportedHardware,
 };
-
 pub const Serial = struct {
     initialised: bool = false,
     com: cpu.COM,
 
-    var instances: [4]?*Serial = [_]?*Serial{null} ** 4;
-    var storage: [4]Serial = undefined;  // Backing storage
+    // Static singleton instance for COM1
+    var com1_instance: Serial = Serial{
+        .initialised = false,
+        .com = cpu.COM.init(0x3F8),
+    };
 
-    pub fn get(comptime port_base: u16) !*Serial {
-        // Map port base address to array index
-        const com_index: u3 = switch (port_base) {
-            0x3F8 => 0, // COM1
-            0x2F8 => 1, // COM2
-            0x3E8 => 2, // COM3
-            0x2E8 => 3, // COM4
-            else => return error.UnsupportedHardware,
-        };
-
-        if (instances[com_index] == null) {
-            storage[com_index] = Serial{
-                .initialised = false,
-                .com = cpu.COM.init(port_base),
-            };
-            instances[com_index] = &storage[com_index];
-            try instances[com_index].?.initInternal();
+    pub fn get_com1() !*Serial {
+        if (!com1_instance.initialised){
+            try com1_instance.initInternal();
         }
-        return instances[com_index].?;
+        return &com1_instance;
     }
 
     fn initInternal(self: *Serial) !void {
@@ -61,14 +49,9 @@ pub const Serial = struct {
         // exit loopback
         self.com.MCR.outb(0x0F);
         self.initialised = true;
-        self.com.DATA.outb('x'); // test byte
-
-        debug.Debug.register_writer(self.writer().any()) catch {
-            self.writeBytes("Serial port registration failed\n");
-        };
     }
 
-    pub fn writeBytes(self: *Serial,data: []const u8) void {
+    pub fn writeBytes(self: *Serial, data: []const u8) void {
         if (!self.initialised) {
             return;
         }
@@ -77,17 +60,21 @@ pub const Serial = struct {
         }
     }
 
-    fn writeBytesFn(context: *Serial, bytes: []const u8) error{}!usize {
-        if (!context.initialised) {
+    fn writeBytesFn(context: *const anyopaque, bytes: []const u8) anyerror!usize {
+        const self: *Serial = @constCast(@alignCast(@ptrCast(context)));
+        if (!self.initialised) {
             return 0;
         }
         for (bytes) |byte| {
-            context.com.DATA.outb(byte);
+            self.com.DATA.outb(byte);
         }
         return bytes.len;
     }
 
-    pub fn writer(self: *Serial) std.io.GenericWriter(*Serial, error{}, writeBytesFn) {
-        return .{ .context = self };
+    pub fn Writer(self: *Serial) std.io.AnyWriter {
+        return .{
+            .context = self,
+            .writeFn = writeBytesFn,
+        };
     }
 };
