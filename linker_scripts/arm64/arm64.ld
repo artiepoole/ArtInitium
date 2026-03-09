@@ -3,14 +3,40 @@
  * SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Artie Poole */
 
-OUTPUT_ARCH(arm64)
-OUTPUT_FORMAT("binary")        /* produce a flat binary, not ELF */
-ENTRY(arm64_start)                  /* entry point symbol from boot.s */
+OUTPUT_ARCH(aarch64)
+OUTPUT_FORMAT("elf64-littleaarch64") /* ELF for arm64 */
+ENTRY(arm64_start)
 
-MEMORY
+/* arbitrary start address - will aim to make it PIE eventually */
+START_ADDR = 0x40080000;
+
+SECTIONS
 {
-    /* I have no idea how this is laid out in qemu yet - is it defined by device tree? */
-    BOOT : ORIGIN = 0x7C00, LENGTH = 512
-    STAGE1B : ORIGIN = 0x8000, LENGTH = 31K /* Allow 1kb for stack */
-    STAGE2 : ORIGIN = 0x10000, LENGTH = 0x8fc00 /* 0x9fc00 */
+    /* Place .text at the custom start address */
+    . = START_ADDR;
+    .text :
+    {
+        *(.text .text.*)
+    }
+
+    .rodata :
+    {
+        *(.rodata .rodata.*)
+    }
+
+    .data :
+    {
+        *(.data .data.*)
+    }
+
+    .bss :
+    {
+        *(.bss .bss.* COMMON)
+    }
+
+    /* Discard unwanted sections */
+    /DISCARD/ :
+    {
+        *(.note* .comment .eh_frame .gnu*)
+    }
 }
