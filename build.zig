@@ -161,9 +161,6 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
     const binman = b.addSystemCommand(&.{ "binman", "build", "-d" });
-    binman.step.dependOn(&install_stage1a.step);
-    binman.step.dependOn(&install_stage1b.step);
-    binman.step.dependOn(&install_binary_32.step);
     binman.addFileArg(dtb_output);
     // Pass the directories containing each artifact as -I so binman can find them by filename
     binman.addArg("-I");
@@ -206,7 +203,6 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     build_all.dependOn(elf_32);
     build_all.dependOn(step_32);
     build_all.dependOn(&install_image.step);
-    build_all.dependOn(b.getInstallStep());
 
     const make_image = b.step("make_image", "Assemble disk image using binman");
     make_image.dependOn(build_all);
