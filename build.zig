@@ -146,33 +146,6 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32");
 
     // ---------------------------------------------------------------
-    // Define `zig build [target]` targets
-    // ---------------------------------------------------------------
-
-    const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
-    step_16.dependOn(&install_binary_16.step);
-    step_16.dependOn(&install_elf_16.step);
-    step_16.dependOn(&install_stage1a.step);
-    step_16.dependOn(&install_stage1b.step);
-
-    // Build the 32-bit executable as an elf file so that we can  use it for debugging purposes.
-    const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
-    elf_32.dependOn(&install_elf_32.step);
-
-    const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
-    step_32.dependOn(&install_binary_32.step);
-
-    // Default to build all of them
-    const build_all = b.step("build_all", "Build 16 and 32 bit binaries");
-    b.default_step = build_all;
-
-    // Create the "all" dependency tree to install all artifacts
-    build_all.dependOn(step_16);
-    build_all.dependOn(elf_32);
-    build_all.dependOn(step_32);
-    build_all.dependOn(b.getInstallStep());
-
-    // ---------------------------------------------------------------
     // Assemble disk image using dtc + binman
     // ---------------------------------------------------------------
 
@@ -188,6 +161,9 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
     const binman = b.addSystemCommand(&.{ "binman", "build", "-d" });
+    binman.step.dependOn(&install_stage1a.step);
+    binman.step.dependOn(&install_stage1b.step);
+    binman.step.dependOn(&install_binary_32.step);
     binman.addFileArg(dtb_output);
     // Pass the directories containing each artifact as -I so binman can find them by filename
     binman.addArg("-I");
@@ -204,9 +180,36 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     const image_file = image_out_dir.path(b, "artinitium.x86_32.img");
     const install_image = b.addInstallFile(image_file, "bin/artinitium.x86_32.img");
 
+    // ---------------------------------------------------------------
+    // Define `zig build [target]` targets
+    // ---------------------------------------------------------------
+
+    const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
+    step_16.dependOn(&install_binary_16.step);
+    step_16.dependOn(&install_elf_16.step);
+    step_16.dependOn(&install_stage1a.step);
+    step_16.dependOn(&install_stage1b.step);
+
+    // Build the 32-bit executable as an elf file so that we can use it for debugging purposes.
+    const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
+    elf_32.dependOn(&install_elf_32.step);
+
+    const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
+    step_32.dependOn(&install_binary_32.step);
+
+    // Default to build all of them
+    const build_all = b.step("build_all", "Build 16 and 32 bit binaries");
+    b.default_step = build_all;
+
+    // Create the "all" dependency tree to install all artifacts
+    build_all.dependOn(step_16);
+    build_all.dependOn(elf_32);
+    build_all.dependOn(step_32);
+    build_all.dependOn(&install_image.step);
+    build_all.dependOn(b.getInstallStep());
+
     const make_image = b.step("make_image", "Assemble disk image using binman");
     make_image.dependOn(build_all);
-    make_image.dependOn(&install_image.step);
 
     const clean_step = b.addRemoveDirTree(b.path("zig-out"));
     const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
