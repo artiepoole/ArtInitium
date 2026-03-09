@@ -1,4 +1,4 @@
-// ArtInium - Bootloader for x86_32 qemu
+// ArtInium - MultiArch Bootloader qemu
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
@@ -7,7 +7,7 @@
 pub const header = @import("bios_header.zig");
 pub const mmap = @import("MMap.zig");
 pub const vbe = @import("VBE.zig");
-pub const log = @import("../log.zig");
+pub const log = @import("../../common/log.zig");
 
 const BiosHeaderMagic: u32 = 0x41525449; // ARTI boot info magic
 

@@ -39,8 +39,8 @@ echo "Building ArtInium bootloader..."
 zig build build_all
 
 
-stage1_file="zig-out/bin/ArtInium.16"
-stage2_file="zig-out/bin/ArtInium.32"
+stage1_file="zig-out/bin/ArtInium.16.x86_32"
+stage2_file="zig-out/bin/ArtInium.32.x86_32"
 
 echo "Creating bootable disk image..."
 # Create a 10MB disk image

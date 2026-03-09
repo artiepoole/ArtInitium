@@ -2,11 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
-//
-//
 const std = @import("std");
-const serial = @import("serial.zig");
-const buffered_list = @import("mem/buffered_list.zig");
+const builtin = @import("builtin");
+pub const serial = switch (builtin.cpu.arch) {
+    .x86 => @import("../x86_32/serial.zig"),
+    // .x86_64 => @import("x86_64/serial.zig"),
+    // .arm, .armeb => @import("arm32/serial.zig"),
+    // .aarch64, .aarch64_be => @import("arm64/serial.zig"),
+    else => @compileError("Unsupported architecture for serial"),
+};
+const buffered_list = @import("data_types/buffered_list.zig");
 
 pub const LoggerLevel = enum(usize) {
     Trace = 0,

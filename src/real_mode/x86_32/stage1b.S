@@ -1,4 +1,4 @@
-/* ArtInium - Bootloader for x86_32 qemu
+/* ArtInium - MultiArch Bootloader for qemu
  *
  * SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Artie Poole */

@@ -112,7 +112,7 @@ Offset  Size  Description
 
 ## Memory Layout
 
-Real mode memory layout is defined in [linker_scripts](../../linker_scripts/README.md) readme.
+Real mode memory layout is defined in [linker_scripts](../../../linker_scripts/x86_32/README.md) readme.
 
 ```
 0x7C00 - 0x7DFF   Stage 1a (512 bytes)

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
 
-// src/lib/mem/buffered_list.zig
 const std = @import("std");
 
 /// A self-contained ArrayList with flexible buffer management.

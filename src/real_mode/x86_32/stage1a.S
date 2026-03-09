@@ -1,7 +1,7 @@
-/* ArtInium - Bootloader for x86_32 qemu
+/* ArtInium - MultiArch Bootloader for qemu
  *
  * SPDX-License-Identifier: MIT
- * Copyright (c) ${YEAR} Artie Poole */
+ * Copyright (c) 2026 Artie Poole */
 
 
 #ifndef STAGE1B_SECTORS
@@ -19,7 +19,7 @@
  * This stage1 bootloader just loads stage 1b and
  * enables A20. Loads 32*16kb - needs to be adjusted
  * ------------------------------------------------- */
-
+_start:
 __stage_1a_start:
     cli
     xor %ax, %ax

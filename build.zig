@@ -1,8 +1,43 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) void {
     const optimise = b.standardOptimizeOption(.{});
-    const i386_target = b.resolveTargetQuery(.{
+
+    const arch_option = b.option(
+        []const u8,
+        "arch",
+        "Target architecture: x86_32, arm64, or 'all' (default: x86_32)",
+    ) orelse "x86_32";
+
+    const arm64_target = b.resolveTargetQuery(.{
+        .cpu_arch = .aarch64,
+        .os_tag = .freestanding,
+    });
+
+    // just use it to avoid "unused variable" compile error for now, since we can't build arm64 yet
+    _ = arm64_target;
+
+    const build_x86 =
+        std.mem.eql(u8, arch_option, "x86_32") or
+        std.mem.eql(u8, arch_option, "all");
+    const build_arm64 =
+        std.mem.eql(u8, arch_option, "arm64") or
+        std.mem.eql(u8, arch_option, "all");
+
+    // Build x86_32 if requested
+    if (build_x86) {
+        buildX86(b, optimise);
+    }
+
+    // Build ARM64 if requested
+    if (build_arm64) {
+        buildArm64(b, optimise);
+    }
+}
+
+fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
+    const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86,
         .os_tag = .freestanding,
         .cpu_model = .{ .explicit = &std.Target.x86.cpu.i386 },
@@ -29,9 +64,9 @@ pub fn build(b: *std.Build) void {
     const stage1b_obj = assemble_stage1b.addOutputFileArg("stage1b.o");
 
     // Define the executable as a linked target which zig should build - creates automatic output names etc
-    const real_mode_module = b.createModule(.{ .target = i386_target, .optimize = optimise });
-    const real_mode_exe = b.addExecutable(.{ .name = "ArtInium.16", .root_module = real_mode_module });
-    real_mode_exe.setLinkerScript(b.path("linker_scripts/real_mode.ld"));
+    const real_mode_module = b.createModule(.{ .target = target, .optimize = optimise });
+    const real_mode_exe = b.addExecutable(.{ .name = "ArtInium.16.x86_32", .root_module = real_mode_module });
+    real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
     real_mode_exe.addObjectFile(stage1a_obj);
     real_mode_exe.addObjectFile(stage1b_obj);
 
@@ -42,15 +77,32 @@ pub fn build(b: *std.Build) void {
     // Define the libary module which contains all shared code
     const artlib_mod = b.addModule("artlib", .{
         .root_source_file = b.path("src/lib/root.zig"),
-        .target = i386_target,
+        .target = target,
     });
 
     // Define the protected mode executable elf file
-    const elf_32_mod = b.createModule(.{ .root_source_file = b.path("src/protected_mode/main.zig"), .target = i386_target, .optimize = optimise, .imports = &.{.{ .name = "artlib", .module = artlib_mod }} });
-    const elf_32_exe = b.addExecutable(.{ .name = "ArtInium.32.elf", .root_module = elf_32_mod });
+    const elf_32_mod = b.createModule(
+        .{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimise,
+            .imports = &.{
+                .{
+                    .name = "artlib",
+                    .module = artlib_mod,
+                },
+            },
+        },
+    );
+    const elf_32_exe = b.addExecutable(
+        .{
+            .name = "ArtInium.32.x86_32.elf",
+            .root_module = elf_32_mod,
+        },
+    );
 
     // use the custom linker script to load in at 64KB
-    elf_32_exe.linker_script = b.path("linker_scripts/protected_mode.ld");
+    elf_32_exe.linker_script = b.path("linker_scripts/x86_32/protected_mode.ld");
 
     // Extract the binary executable from the elf for use in the image
     const objcopy_32 = b.addSystemCommand(&.{
@@ -59,14 +111,14 @@ pub fn build(b: *std.Build) void {
         "binary",
     });
     objcopy_32.addArtifactArg(elf_32_exe);
-    const binary_32_output = objcopy_32.addOutputFileArg("ArtInium.32");
+    const binary_32_output = objcopy_32.addOutputFileArg("ArtInium.32.x86_32");
 
     // ---------------------------------------------------------------
     // Specify install targets so that files appear in zig-out/bin
     // ---------------------------------------------------------------
     const install_binary_16 = b.addInstallArtifact(real_mode_exe, .{});
     const install_elf_32 = b.addInstallArtifact(elf_32_exe, .{});
-    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInium.32");
+    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInium.32.x86_32");
 
     // ---------------------------------------------------------------
     // Define `zig build [target]` targets
@@ -98,7 +150,6 @@ pub fn build(b: *std.Build) void {
     clean.dependOn(&clean_step.step);
     clean.dependOn(&clean_cache.step);
 
-
     // ---------------------------------------------------------------
     // Create test target to run library Unit tests on host
     // ---------------------------------------------------------------
@@ -114,9 +165,27 @@ pub fn build(b: *std.Build) void {
         .use_lld = true,
     });
 
-    const install_mod_tests = b.addInstallArtifact(mod_tests, .{ .dest_dir = .{ .override = .{ .custom = "test_artlib" } } });
+    const install_mod_tests = b.addInstallArtifact(
+        mod_tests,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = "test_artlib",
+                },
+            },
+        },
+    );
 
     const mod_tests_step = b.step("test_artlib", "Create test binaries for debugging 'root'");
     mod_tests_step.dependOn(&install_mod_tests.step);
+}
 
+fn buildArm64(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
+    std.debug.print(
+        "Cannot build for arm64 yet, sorry.",
+        .{},
+    );
+    _ = b;
+    _ = optimise;
+    return;
 }

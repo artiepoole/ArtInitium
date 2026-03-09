@@ -1,9 +1,9 @@
-// ArtInium - Bootloader for x86_32 qemu
+// ArtInium - MultiArch Bootloader qemu
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
 
-const log = @import("../log.zig");
+const log = @import("../../common/log.zig");
 
 pub const MMapEntry = extern struct {
     base_addr: u64,

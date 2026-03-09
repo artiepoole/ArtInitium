@@ -1,4 +1,4 @@
-// ArtInium - Bootloader for x86_32 qemu
+// ArtInium - MultiArch Bootloader qemu
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
@@ -43,3 +43,9 @@ pub const port_ids = enum {
         pub const DATA = 0x01cf;
     };
 };
+
+pub fn halt() noreturn {
+    while (true) {
+        asm volatile ("hlt");
+    }
+}
