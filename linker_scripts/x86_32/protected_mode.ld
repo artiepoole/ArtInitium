@@ -1,4 +1,4 @@
-/* ArtInium - MultiArch Bootloader for qemu
+/* ArtInitium - MultiArch Bootloader for qemu
  *
  * SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Artie Poole */
@@ -7,7 +7,7 @@ OUTPUT_ARCH(i386)
 /*OUTPUT_FORMAT("binary")*/
 
 OUTPUT_FORMAT(elf32-i386)
-ENTRY(Artinium_32_entry)
+ENTRY(Artinitium_32_entry)
 
 MEMORY
 {

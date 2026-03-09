@@ -1,4 +1,4 @@
-// ArtInium - MultiArch Bootloader qemu
+// ArtInitium - MultiArch Bootloader qemu
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
@@ -14,6 +14,6 @@ pub const init = switch (builtin.cpu.arch) {
     else => @compileError("Unsupported architecture for terminal"),
 };
 
-pub export fn Artinium_32_entry(arg: usize) linksection(".text.entry") callconv(.c) noreturn {
+pub export fn Artinitium_32_entry(arg: usize) linksection(".text.entry") callconv(.c) noreturn {
     init.init(arg);
 }

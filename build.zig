@@ -51,13 +51,13 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     const assemble_stage1a = b.addSystemCommand(&.{
         "as",
         "--32",
-        "src/real_mode/stage1a.S",
+        "src/real_mode/x86_32/stage1a.S",
         "-o",
     });
     const assemble_stage1b = b.addSystemCommand(&.{
         "as",
         "--32",
-        "src/real_mode/stage1b.S",
+        "src/real_mode/x86_32/stage1b.S",
         "-o",
     });
     const stage1a_obj = assemble_stage1a.addOutputFileArg("stage1a.o");
@@ -65,7 +65,7 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     // Define the executable as a linked target which zig should build - creates automatic output names etc
     const real_mode_module = b.createModule(.{ .target = target, .optimize = optimise });
-    const real_mode_exe = b.addExecutable(.{ .name = "ArtInium.16.x86_32", .root_module = real_mode_module });
+    const real_mode_exe = b.addExecutable(.{ .name = "ArtInitium.16.x86_32", .root_module = real_mode_module });
     real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
     real_mode_exe.addObjectFile(stage1a_obj);
     real_mode_exe.addObjectFile(stage1b_obj);
@@ -96,7 +96,7 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     );
     const elf_32_exe = b.addExecutable(
         .{
-            .name = "ArtInium.32.x86_32.elf",
+            .name = "ArtInitium.32.x86_32.elf",
             .root_module = elf_32_mod,
         },
     );
@@ -111,27 +111,27 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
         "binary",
     });
     objcopy_32.addArtifactArg(elf_32_exe);
-    const binary_32_output = objcopy_32.addOutputFileArg("ArtInium.32.x86_32");
+    const binary_32_output = objcopy_32.addOutputFileArg("ArtInitium.32.x86_32");
 
     // ---------------------------------------------------------------
     // Specify install targets so that files appear in zig-out/bin
     // ---------------------------------------------------------------
     const install_binary_16 = b.addInstallArtifact(real_mode_exe, .{});
     const install_elf_32 = b.addInstallArtifact(elf_32_exe, .{});
-    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInium.32.x86_32");
+    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32");
 
     // ---------------------------------------------------------------
     // Define `zig build [target]` targets
     // ---------------------------------------------------------------
 
-    const step_16 = b.step("ArtInium.16", "Build 16-bit binary");
+    const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
     step_16.dependOn(&install_binary_16.step);
 
     // Build the 32-bit executable as an elf file so that we can  use it for debugging purposes.
-    const elf_32 = b.step("ArtInium.32.elf", "Build 32-bit binary");
+    const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
     elf_32.dependOn(&install_elf_32.step);
 
-    const step_32 = b.step("ArtInium.32", "Build 32-bit raw binary");
+    const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
     step_32.dependOn(&install_binary_32.step);
 
     // Default to build all of them

@@ -1,4 +1,4 @@
-/* ArtInium - MultiArch Bootloader for qemu
+/* ArtInitium - MultiArch Bootloader for qemu
  *
  * SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Artie Poole */
@@ -453,7 +453,7 @@ gdt_descriptor:
 .section .stage1b.data,"aw"
 
 hello_msg:
-    .asciz "\r\nArtInium Stage1b - Hello World!\r\n"
+    .asciz "\r\nArtInitium Stage1b - Hello World!\r\n"
 
 vga_msg:
     .asciz "Querying VGA/VBE modes...\r\n"

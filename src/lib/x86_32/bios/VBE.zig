@@ -1,4 +1,4 @@
-// ArtInium - MultiArch Bootloader qemu
+// ArtInitium - MultiArch Bootloader qemu
 //
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole

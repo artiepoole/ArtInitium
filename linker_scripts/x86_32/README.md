@@ -7,7 +7,7 @@ Load addresses
 |-----------|------------------------------------------|---------------:|
 | 0x7c00    | fixed by bios: first 512 bytes (stage1a) |          31 KB |
 | 0x8000    | Start of stage1b                         |          32 KB |
-| 0x10000   | 32-bit bootloader code (ArtInium.32)     |          64 KB |
+| 0x10000   | 32-bit bootloader code (ArtInitium.32)     |          64 KB |
 | 0x100000+ | Valid kernel load addresses              |          >1 MB |
 
 stage1a memory map

@@ -31,7 +31,7 @@
 
 ```
 Uses BIOS INT 10h (teletype mode) to display:
-"ArtInium Stage1b - Hello World!"
+"ArtInitium Stage1b - Hello World!"
 ```
 
 - Demonstrates BIOS services are working
