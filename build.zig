@@ -36,6 +36,23 @@ pub fn build(b: *std.Build) void {
     }
 }
 
+/// Tree for build_x86_32 target:
+/// build_x86_32
+/// ├── step_16
+/// │   ├── install_binary_16
+/// │   ├── install_elf_16
+/// │   ├── install_stage1a
+/// │   └── install_stage1b
+/// ├── elf_32
+/// │   └── install_elf_32
+/// ├── step_32
+/// │   └── install_binary_32
+/// └── install_image
+///     └── binman
+///         ├── dtc
+///         ├── stage1a_bin (dirname)
+///         ├── stage1b_bin (dirname)
+///         └── binary_32_output (dirname)
 fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86,
@@ -194,18 +211,17 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
     step_32.dependOn(&install_binary_32.step);
 
-    // Default to build all of them
-    const build_all = b.step("build_all", "Build 16 and 32 bit binaries");
-    b.default_step = build_all;
+    // Default to build all x86_32 targets
+    const build_x86_32 = b.step("build_x86_32", "Build all x86_32 binaries");
+    b.default_step = build_x86_32;
 
-    // Create the "all" dependency tree to install all artifacts
-    build_all.dependOn(step_16);
-    build_all.dependOn(elf_32);
-    build_all.dependOn(step_32);
-    build_all.dependOn(&install_image.step);
+    build_x86_32.dependOn(step_16);
+    build_x86_32.dependOn(elf_32);
+    build_x86_32.dependOn(step_32);
+    build_x86_32.dependOn(&install_image.step);
 
     const make_image = b.step("make_image", "Assemble disk image using binman");
-    make_image.dependOn(build_all);
+    make_image.dependOn(build_x86_32);
 
     const clean_step = b.addRemoveDirTree(b.path("zig-out"));
     const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
