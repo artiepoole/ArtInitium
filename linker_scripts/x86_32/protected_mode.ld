@@ -4,9 +4,7 @@
  * Copyright (c) 2026 Artie Poole */
 
 OUTPUT_ARCH(i386)
-/*OUTPUT_FORMAT("binary")*/
-
-OUTPUT_FORMAT(elf64-littleaarch64)
+OUTPUT_FORMAT(elf32-i386)
 ENTRY(Artinitium_32_entry)
 
 MEMORY

@@ -65,10 +65,36 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     // Define the executable as a linked target which zig should build - creates automatic output names etc
     const real_mode_module = b.createModule(.{ .target = target, .optimize = optimise });
-    const real_mode_exe = b.addExecutable(.{ .name = "ArtInitium.16.x86_32", .root_module = real_mode_module });
+    const real_mode_exe = b.addExecutable(.{ .name = "ArtInitium.16.x86_32.elf", .root_module = real_mode_module });
     real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
     real_mode_exe.addObjectFile(stage1a_obj);
     real_mode_exe.addObjectFile(stage1b_obj);
+
+    // Extract stage1a (MBR, first 512 bytes) from the linked ELF by section
+    const objcopy_stage1a = b.addSystemCommand(&.{
+        "objcopy", "--only-section=.stage1a", "-O", "binary",
+    });
+    objcopy_stage1a.addArtifactArg(real_mode_exe);
+    const stage1a_bin = objcopy_stage1a.addOutputFileArg("ArtInitium.16.x86_32.a");
+
+    // Extract stage1b (real-mode loader) from the linked ELF by section
+    const objcopy_stage1b = b.addSystemCommand(&.{
+        "objcopy", "--only-section=.stage1b", "-O", "binary",
+    });
+    objcopy_stage1b.addArtifactArg(real_mode_exe);
+    const stage1b_bin = objcopy_stage1b.addOutputFileArg("ArtInitium.16.x86_32.b");
+
+    // Also produce the combined flat binary (stage1a + stage1b) for reference
+    const objcopy_16 = b.addSystemCommand(&.{
+        "objcopy", "-O", "binary",
+    });
+    objcopy_16.addArtifactArg(real_mode_exe);
+    const binary_16_output = objcopy_16.addOutputFileArg("ArtInitium.16.x86_32");
+
+    const install_stage1a = b.addInstallFile(stage1a_bin, "bin/ArtInitium.16.x86_32.a");
+    const install_stage1b = b.addInstallFile(stage1b_bin, "bin/ArtInitium.16.x86_32.b");
+    const install_binary_16 = b.addInstallFile(binary_16_output, "bin/ArtInitium.16.x86_32");
+    const install_elf_16 = b.addInstallArtifact(real_mode_exe, .{});
 
     // ---------------------------------------------------------------
     // Build 32-bit binaries
@@ -116,7 +142,6 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     // ---------------------------------------------------------------
     // Specify install targets so that files appear in zig-out/bin
     // ---------------------------------------------------------------
-    const install_binary_16 = b.addInstallArtifact(real_mode_exe, .{});
     const install_elf_32 = b.addInstallArtifact(elf_32_exe, .{});
     const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32");
 
@@ -126,6 +151,9 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
     step_16.dependOn(&install_binary_16.step);
+    step_16.dependOn(&install_elf_16.step);
+    step_16.dependOn(&install_stage1a.step);
+    step_16.dependOn(&install_stage1b.step);
 
     // Build the 32-bit executable as an elf file so that we can  use it for debugging purposes.
     const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
@@ -143,6 +171,42 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     build_all.dependOn(elf_32);
     build_all.dependOn(step_32);
     build_all.dependOn(b.getInstallStep());
+
+    // ---------------------------------------------------------------
+    // Assemble disk image using dtc + binman
+    // ---------------------------------------------------------------
+
+    // Compile the .its to a .dtb
+    const dtc = b.addSystemCommand(&.{
+        "dtc",
+        "-I", "dts",
+        "-O", "dtb",
+        "-o",
+    });
+    const dtb_output = dtc.addOutputFileArg("artinium_x86_32.dtb");
+    dtc.addArg("image_layouts/artinium_x86_32.its");
+
+    // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
+    const binman = b.addSystemCommand(&.{ "binman", "build", "-d" });
+    binman.addFileArg(dtb_output);
+    // Pass the directories containing each artifact as -I so binman can find them by filename
+    binman.addArg("-I");
+    binman.addDirectoryArg(stage1a_bin.dirname());
+    binman.addArg("-I");
+    binman.addDirectoryArg(stage1b_bin.dirname());
+    binman.addArg("-I");
+    binman.addDirectoryArg(binary_32_output.dirname());
+    // Capture output directory as a zig-tracked path
+    binman.addArg("-O");
+    const image_out_dir = binman.addOutputDirectoryArg("binman_out");
+
+    // Reference the image file within the tracked output directory
+    const image_file = image_out_dir.path(b, "artinitium.x86_32.img");
+    const install_image = b.addInstallFile(image_file, "bin/artinitium.x86_32.img");
+
+    const make_image = b.step("make_image", "Assemble disk image using binman");
+    make_image.dependOn(build_all);
+    make_image.dependOn(&install_image.step);
 
     const clean_step = b.addRemoveDirTree(b.path("zig-out"));
     const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
