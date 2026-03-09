@@ -1,35 +1,70 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const ArchOptions = struct {
+    x86_32: bool,
+    arm64: bool,
+
+    fn parse(opt: []const u8) ArchOptions {
+        var result = ArchOptions{ .x86_32 = false, .arm64 = false };
+        var it = std.mem.splitScalar(u8, opt, ',');
+        while (it.next()) |token| {
+            const trimmed = std.mem.trim(u8, token, " ");
+            if (std.mem.eql(u8, trimmed, "all")) {
+                result.x86_32 = true;
+                result.arm64 = true;
+            } else if (std.mem.eql(u8, trimmed, "x86_32")) {
+                result.x86_32 = true;
+            } else if (std.mem.eql(u8, trimmed, "arm64")) {
+                result.arm64 = true;
+            }
+        }
+        return result;
+    }
+};
+
 const OutOptions = struct {
     bin: bool,
     elf: bool,
     img: bool,
 
     fn parse(opt: []const u8) OutOptions {
-        const all = std.mem.eql(u8, opt, "all");
-        return .{
-            .bin = all or std.mem.eql(u8, opt, "bin"),
-            .elf = all or std.mem.eql(u8, opt, "elf"),
-            .img = all or std.mem.eql(u8, opt, "img"),
-        };
+        var result = OutOptions{ .bin = false, .elf = false, .img = false };
+        var it = std.mem.splitScalar(u8, opt, ',');
+        while (it.next()) |token| {
+            const trimmed = std.mem.trim(u8, token, " ");
+            if (std.mem.eql(u8, trimmed, "all")) {
+                result.bin = true;
+                result.elf = true;
+                result.img = true;
+            } else if (std.mem.eql(u8, trimmed, "bin")) {
+                result.bin = true;
+            } else if (std.mem.eql(u8, trimmed, "elf")) {
+                result.elf = true;
+            } else if (std.mem.eql(u8, trimmed, "img")) {
+                result.img = true;
+            }
+        }
+        return result;
     }
 };
 
 pub fn build(b: *std.Build) void {
     const optimise = b.standardOptimizeOption(.{});
 
-    const arch_option = b.option(
+    const architectures_option = b.option(
         []const u8,
-        "arch",
-        "Target architecture: x86_32, arm64, or 'all' (default: x86_32)",
-    ) orelse "x86_32";
+        "architectures",
+        "Target architectures: x86_32, arm64, or 'all' (default: x86_32)",
+    ) orelse "all";
+
+    const architectures = ArchOptions.parse(architectures_option);
 
     const output_types_option = b.option(
         []const u8,
         "output_types",
         "Output types: bin, elf, img or 'all' (default: all)",
-    ) orelse "img";
+    ) orelse "all";
 
     const output_types = OutOptions.parse(output_types_option);
 
@@ -41,20 +76,13 @@ pub fn build(b: *std.Build) void {
     // just use it to avoid "unused variable" compile error for now, since we can't build arm64 yet
     _ = arm64_target;
 
-    const build_x86 =
-        std.mem.eql(u8, arch_option, "x86_32") or
-        std.mem.eql(u8, arch_option, "all");
-    const build_arm64 =
-        std.mem.eql(u8, arch_option, "arm64") or
-        std.mem.eql(u8, arch_option, "all");
-
     // Build x86_32 if requested
-    if (build_x86) {
+    if (architectures.x86_32) {
         buildX86(b, optimise, output_types);
     }
 
     // Build ARM64 if requested
-    if (build_arm64) {
+    if (architectures.arm64) {
         buildArm64(b, optimise, output_types);
     }
 }
@@ -288,7 +316,7 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: Out
 
 fn buildArm64(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: OutOptions) void {
     std.debug.print(
-        "Cannot build for arm64 yet, sorry.",
+        "We cannot build for arm64 yet, sorry.\n",
         .{},
     );
     _ = b;
