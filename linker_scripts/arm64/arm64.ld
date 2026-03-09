@@ -1,3 +1,8 @@
+/* ArtInitium - MultiArch Bootloader for qemu
+ *
+ * SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Artie Poole */
+
 OUTPUT_ARCH(arm64)
 OUTPUT_FORMAT("binary")        /* produce a flat binary, not ELF */
 ENTRY(arm64_start)                  /* entry point symbol from boot.s */

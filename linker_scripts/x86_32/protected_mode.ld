@@ -6,7 +6,7 @@
 OUTPUT_ARCH(i386)
 /*OUTPUT_FORMAT("binary")*/
 
-OUTPUT_FORMAT(elf32-i386)
+OUTPUT_FORMAT(elf64-littleaarch64)
 ENTRY(Artinitium_32_entry)
 
 MEMORY
