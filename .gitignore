@@ -1,3 +1,7 @@
+.idea
+sandbox/
 .zig-cache/
 zig-out/
 *.o
+*.img
+*.log
