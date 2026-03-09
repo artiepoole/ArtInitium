@@ -1,6 +1,21 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const OutOptions = struct {
+    bin: bool,
+    elf: bool,
+    img: bool,
+
+    fn parse(opt: []const u8) OutOptions {
+        const all = std.mem.eql(u8, opt, "all");
+        return .{
+            .bin = all or std.mem.eql(u8, opt, "bin"),
+            .elf = all or std.mem.eql(u8, opt, "elf"),
+            .img = all or std.mem.eql(u8, opt, "img"),
+        };
+    }
+};
+
 pub fn build(b: *std.Build) void {
     const optimise = b.standardOptimizeOption(.{});
 
@@ -9,6 +24,14 @@ pub fn build(b: *std.Build) void {
         "arch",
         "Target architecture: x86_32, arm64, or 'all' (default: x86_32)",
     ) orelse "x86_32";
+
+    const output_types_option = b.option(
+        []const u8,
+        "output_types",
+        "Output types: bin, elf, img or 'all' (default: all)",
+    ) orelse "img";
+
+    const output_types = OutOptions.parse(output_types_option);
 
     const arm64_target = b.resolveTargetQuery(.{
         .cpu_arch = .aarch64,
@@ -27,12 +50,12 @@ pub fn build(b: *std.Build) void {
 
     // Build x86_32 if requested
     if (build_x86) {
-        buildX86(b, optimise);
+        buildX86(b, optimise, output_types);
     }
 
     // Build ARM64 if requested
     if (build_arm64) {
-        buildArm64(b, optimise);
+        buildArm64(b, optimise, output_types);
     }
 }
 
@@ -53,7 +76,11 @@ pub fn build(b: *std.Build) void {
 ///         ├── stage1a_bin (dirname)
 ///         ├── stage1b_bin (dirname)
 ///         └── binary_32_output (dirname)
-fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
+fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: OutOptions) void {
+    const out_bin = output_types.bin;
+    const out_elf = output_types.elf;
+    const out_img = output_types.img;
+
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86,
         .os_tag = .freestanding,
@@ -108,10 +135,10 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     objcopy_16.addArtifactArg(real_mode_exe);
     const binary_16_output = objcopy_16.addOutputFileArg("ArtInitium.16.x86_32");
 
-    const install_stage1a = b.addInstallFile(stage1a_bin, "bin/ArtInitium.16.x86_32.a");
-    const install_stage1b = b.addInstallFile(stage1b_bin, "bin/ArtInitium.16.x86_32.b");
-    const install_binary_16 = b.addInstallFile(binary_16_output, "bin/ArtInitium.16.x86_32");
-    const install_elf_16 = b.addInstallArtifact(real_mode_exe, .{});
+    const install_stage1a = if (out_bin) b.addInstallFile(stage1a_bin, "bin/ArtInitium.16.x86_32.a") else null;
+    const install_stage1b = if (out_bin) b.addInstallFile(stage1b_bin, "bin/ArtInitium.16.x86_32.b") else null;
+    const install_binary_16 = if (out_bin) b.addInstallFile(binary_16_output, "bin/ArtInitium.16.x86_32") else null;
+    const install_elf_16 = if (out_elf) b.addInstallArtifact(real_mode_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
 
     // ---------------------------------------------------------------
     // Build 32-bit binaries
@@ -159,8 +186,8 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     // ---------------------------------------------------------------
     // Specify install targets so that files appear in zig-out/bin
     // ---------------------------------------------------------------
-    const install_elf_32 = b.addInstallArtifact(elf_32_exe, .{});
-    const install_binary_32 = b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32");
+    const install_elf_32 = if (out_elf) b.addInstallArtifact(elf_32_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
+    const install_binary_32 = if (out_bin) b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32") else null;
 
     // ---------------------------------------------------------------
     // Assemble disk image using dtc + binman
@@ -192,24 +219,24 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
 
     // Reference the image file within the tracked output directory
     const image_file = image_out_dir.path(b, "artinitium.x86_32.img");
-    const install_image = b.addInstallFile(image_file, "bin/artinitium.x86_32.img");
+    const install_image = if (out_img) b.addInstallFile(image_file, "img/artinitium.x86_32.img") else null;
 
     // ---------------------------------------------------------------
     // Define `zig build [target]` targets
     // ---------------------------------------------------------------
 
     const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
-    step_16.dependOn(&install_binary_16.step);
-    step_16.dependOn(&install_elf_16.step);
-    step_16.dependOn(&install_stage1a.step);
-    step_16.dependOn(&install_stage1b.step);
+    if (install_binary_16) |s| step_16.dependOn(&s.step);
+    if (install_elf_16) |s| step_16.dependOn(&s.step);
+    if (install_stage1a) |s| step_16.dependOn(&s.step);
+    if (install_stage1b) |s| step_16.dependOn(&s.step);
 
     // Build the 32-bit executable as an elf file so that we can use it for debugging purposes.
     const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
-    elf_32.dependOn(&install_elf_32.step);
+    if (install_elf_32) |s| elf_32.dependOn(&s.step);
 
     const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
-    step_32.dependOn(&install_binary_32.step);
+    if (install_binary_32) |s| step_32.dependOn(&s.step);
 
     // Default to build all x86_32 targets
     const build_x86_32 = b.step("build_x86_32", "Build all x86_32 binaries");
@@ -218,7 +245,7 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     build_x86_32.dependOn(step_16);
     build_x86_32.dependOn(elf_32);
     build_x86_32.dependOn(step_32);
-    build_x86_32.dependOn(&install_image.step);
+    if (install_image) |s| build_x86_32.dependOn(&s.step);
 
     const make_image = b.step("make_image", "Assemble disk image using binman");
     make_image.dependOn(build_x86_32);
@@ -259,12 +286,13 @@ fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
     mod_tests_step.dependOn(&install_mod_tests.step);
 }
 
-fn buildArm64(b: *std.Build, optimise: std.builtin.OptimizeMode) void {
+fn buildArm64(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: OutOptions) void {
     std.debug.print(
         "Cannot build for arm64 yet, sorry.",
         .{},
     );
     _ = b;
     _ = optimise;
+    _ = output_types;
     return;
 }
