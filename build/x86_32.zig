@@ -115,7 +115,7 @@ pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: op
         protected_mode_artifacts.bin_32,
     );
     const install_image = if (out_img)
-        b.addInstallFile(image_file, "img/artinitium.x86_32.img")
+        b.addInstallFile(image_file, "img/ArtInitium.x86_32.img")
     else
         null;
 
@@ -254,8 +254,8 @@ fn buildDiskImage(
         "dtb",
         "-o",
     });
-    const dtb_output = dtc.addOutputFileArg("artinium_x86_32.dtb");
-    dtc.addArg("image_layouts/artinium_x86_32.its");
+    const dtb_output = dtc.addOutputFileArg("ArtInitium_x86_32.dtb");
+    dtc.addArg("image_layouts/ArtInitium.x86_32.its");
 
     // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
     const binman = b.addSystemCommand(&.{
@@ -276,7 +276,7 @@ fn buildDiskImage(
     const image_out_dir = binman.addOutputDirectoryArg("binman_out");
 
     // Reference the image file within the tracked output directory
-    return image_out_dir.path(b, "artinitium.x86_32.img");
+    return image_out_dir.path(b, "ArtInitium.x86_32.img");
 }
 
 /// Setup all build step targets

@@ -22,7 +22,7 @@
 	#size-cells = <1>;
 
 	binman {
-		filename = "artinitium.x86_32.img";
+		filename = "ArtInitium.x86_32.img";
 		size = <0xa00000>; /* 10 MB */
 		fill-byte = [00];
 
