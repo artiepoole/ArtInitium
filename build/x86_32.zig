@@ -71,17 +71,39 @@ pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: op
     // ---------------------------------------------------------------
     const real_mode_artifacts = build16BitBinaries(b, optimise, target);
 
-    const install_bin_16a = if (out_bin) b.addInstallFile(real_mode_artifacts.bin_16a, "bin/ArtInitium.16.x86_32.a") else null;
-    const install_bin_16b = if (out_bin) b.addInstallFile(real_mode_artifacts.bin_16b, "bin/ArtInitium.16.x86_32.b") else null;
-    const install_elf_16 = if (out_elf) b.addInstallArtifact(real_mode_artifacts.elf_16_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
+    const install_bin_16a = if (out_bin)
+        b.addInstallFile(real_mode_artifacts.bin_16a, "bin/ArtInitium.16.x86_32.a")
+    else
+        null;
+
+    const install_bin_16b = if (out_bin)
+        b.addInstallFile(real_mode_artifacts.bin_16b, "bin/ArtInitium.16.x86_32.b")
+    else
+        null;
+
+    const install_elf_16 = if (out_elf)
+        b.addInstallArtifact(real_mode_artifacts.elf_16_exe, .{
+            .dest_dir = .{ .override = .{ .custom = "elf" } },
+        })
+    else
+        null;
 
     // ---------------------------------------------------------------
     // Build 32-bit binaries
     // ---------------------------------------------------------------
     const protected_mode_artifacts = build32BitBinaries(b, optimise, target);
 
-    const install_elf_32 = if (out_elf) b.addInstallArtifact(protected_mode_artifacts.elf_32_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
-    const install_bin_32 = if (out_bin) b.addInstallFile(protected_mode_artifacts.bin_32, "bin/ArtInitium.32.x86_32") else null;
+    const install_elf_32 = if (out_elf)
+        b.addInstallArtifact(protected_mode_artifacts.elf_32_exe, .{
+            .dest_dir = .{ .override = .{ .custom = "elf" } },
+        })
+    else
+        null;
+
+    const install_bin_32 = if (out_bin)
+        b.addInstallFile(protected_mode_artifacts.bin_32, "bin/ArtInitium.32.x86_32")
+    else
+        null;
 
     // ---------------------------------------------------------------
     // Assemble disk image using dtc + binman
@@ -92,7 +114,10 @@ pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: op
         real_mode_artifacts.bin_16b,
         protected_mode_artifacts.bin_32,
     );
-    const install_image = if (out_img) b.addInstallFile(image_file, "img/artinitium.x86_32.img") else null;
+    const install_image = if (out_img)
+        b.addInstallFile(image_file, "img/artinitium.x86_32.img")
+    else
+        null;
 
     // ---------------------------------------------------------------
     // Define `zig build [target]` targets
@@ -133,8 +158,14 @@ fn build16BitBinaries(
     const stage1b_obj = assemble_stage1b.addOutputFileArg("stage1b.o");
 
     // Define the executable as a linked target which zig should build
-    const real_mode_module = b.createModule(.{ .target = target, .optimize = optimise });
-    const real_mode_exe = b.addExecutable(.{ .name = "ArtInitium.16.x86_32.elf", .root_module = real_mode_module });
+    const real_mode_module = b.createModule(.{
+        .target = target,
+        .optimize = optimise,
+    });
+    const real_mode_exe = b.addExecutable(.{
+        .name = "ArtInitium.16.x86_32.elf",
+        .root_module = real_mode_module,
+    });
     real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
     real_mode_exe.addObjectFile(stage1a_obj);
     real_mode_exe.addObjectFile(stage1b_obj);
@@ -173,25 +204,21 @@ fn build32BitBinaries(
     });
 
     // Define the protected mode executable elf file
-    const elf_32_mod = b.createModule(
-        .{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimise,
-            .imports = &.{
-                .{
-                    .name = "artlib",
-                    .module = artlib_mod,
-                },
+    const elf_32_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimise,
+        .imports = &.{
+            .{
+                .name = "artlib",
+                .module = artlib_mod,
             },
         },
-    );
-    const elf_32_exe = b.addExecutable(
-        .{
-            .name = "ArtInitium.32.x86_32.elf",
-            .root_module = elf_32_mod,
-        },
-    );
+    });
+    const elf_32_exe = b.addExecutable(.{
+        .name = "ArtInitium.32.x86_32.elf",
+        .root_module = elf_32_mod,
+    });
 
     // Use the custom linker script to load in at 64KB
     elf_32_exe.linker_script = b.path("linker_scripts/x86_32/protected_mode.ld");
@@ -231,7 +258,11 @@ fn buildDiskImage(
     dtc.addArg("image_layouts/artinium_x86_32.its");
 
     // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
-    const binman = b.addSystemCommand(&.{ "binman", "build", "-d" });
+    const binman = b.addSystemCommand(&.{
+        "binman",
+        "build",
+        "-d",
+    });
     binman.addFileArg(dtb_output);
     // Pass the directories containing each artifact as -I so binman can find them by filename
     binman.addArg("-I");
@@ -289,16 +320,13 @@ pub fn buildTests(b: *std.Build) void {
         .use_lld = true,
     });
 
-    const install_mod_tests = b.addInstallArtifact(
-        mod_tests,
-        .{
-            .dest_dir = .{
-                .override = .{
-                    .custom = "test_artlib",
-                },
+    const install_mod_tests = b.addInstallArtifact(mod_tests, .{
+        .dest_dir = .{
+            .override = .{
+                .custom = "test_artlib",
             },
         },
-    );
+    });
 
     const mod_tests_step = b.step("test_artlib", "Create test binaries for debugging 'root'");
     mod_tests_step.dependOn(&install_mod_tests.step);
