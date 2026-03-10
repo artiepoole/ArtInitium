@@ -20,7 +20,23 @@ const InstallSteps = struct {
     install_image: ?*std.Build.Step.InstallFile,
 };
 
-/// Build all x86_32 targets including 16-bit and 32-bit binaries and optionally the disk image
+/// Build x86_32 targets including 16-bit, 32-bit binaries and bootable qemu disk image
+///
+/// Because of x86 build process, the 16-bit binaries must be build using gcc and manual ld calls
+/// (to enable 16-bit flags which zig doesn't support). Because the size of stage1b determines how
+/// much stage1a needs to load, the linker is used to link both stage1a and stage1b together into
+/// an ELF, and then objcopy is used to extract the two binaries by section. The section-by-section
+/// extraction is necessary because the binary needs to have stage1b directly after stage1a at load
+/// time, and the objcopy output has a 512b padding which I could not remove, and binman
+/// expects the size of stage1a to be exactly 0x200 in size, so this makes it easier to call
+/// binman.
+///
+/// The 32-bit binary can be built directly using zig, and the linker *could* specify to build a
+/// flat binary, but we want the ELF with symbols for debugging so we build that and extract the
+/// binary using `objcopy`.
+///
+/// Finally, dtc and binman are used to assemble the final disk image, with zig-tracked paths
+/// passed as inputs and outputs so that zig can track dependencies and clean outputs correctly.
 ///
 /// Tree for build_x86_32 target:
 /// build_x86_32
