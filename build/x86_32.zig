@@ -24,21 +24,21 @@ const InstallSteps = struct {
 ///
 /// Tree for build_x86_32 target:
 /// build_x86_32
-/// ├── step_16
-/// │   ├── install_binary_16
+/// ├── ArtInitium.16 (step_16)
 /// │   ├── install_elf_16
-/// │   ├── install_stage1a
-/// │   └── install_stage1b
-/// ├── elf_32
+/// │   ├── install_bin_16a
+/// │   └── install_bin_16b
+/// ├── ArtInitium.32.elf (elf_32)
 /// │   └── install_elf_32
-/// ├── step_32
-/// │   └── install_binary_32
+/// ├── ArtInitium.32 (step_32)
+/// │   └── install_bin_32
+/// ├── make_image
 /// └── install_image
 ///     └── binman
 ///         ├── dtc
-///         ├── stage1a_bin (dirname)
-///         ├── stage1b_bin (dirname)
-///         └── binary_32_output (dirname)
+///         ├── bin_16a (dirname)
+///         ├── bin_16b (dirname)
+///         └── bin_32 (dirname)
 pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: options.OutOptions) void {
     const out_bin = output_types.bin;
     const out_elf = output_types.elf;
@@ -187,11 +187,11 @@ fn build32BitBinaries(
         "binary",
     });
     objcopy_32.addArtifactArg(elf_32_exe);
-    const binary_32_output = objcopy_32.addOutputFileArg("ArtInitium.32.x86_32");
+    const bin_32 = objcopy_32.addOutputFileArg("ArtInitium.32.x86_32");
 
     return .{
         .elf_32_exe = elf_32_exe,
-        .bin_32 = binary_32_output,
+        .bin_32 = bin_32,
     };
 }
 
