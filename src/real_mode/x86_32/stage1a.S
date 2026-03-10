@@ -19,7 +19,6 @@
  * This stage1 bootloader just loads stage 1b and
  * enables A20. Loads 32*16kb - needs to be adjusted
  * ------------------------------------------------- */
-_start:
 __stage_1a_start:
     cli
     xor %ax, %ax

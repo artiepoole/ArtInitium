@@ -12,16 +12,16 @@ pub fn build(b: *std.Build) void {
     const architectures_option = b.option(
         []const u8,
         "architectures",
-        "Target architectures: x86_32, arm64, or 'all' (default: x86_32)",
-    ) orelse "all";
+        "Target architectures: x86_32, arm64, all, or none (default: none)",
+    ) orelse "none";
 
     const architectures = options.ArchOptions.parse(architectures_option);
 
     const output_types_option = b.option(
         []const u8,
-        "output_types",
-        "Output types: bin, elf, img or 'all' (default: all)",
-    ) orelse "all";
+        "outputs",
+        "Output types: bin, elf, img, all, or none (default: none)",
+    ) orelse "none";
 
     const output_types = options.OutOptions.parse(output_types_option);
 

@@ -16,6 +16,8 @@ pub const ArchOptions = struct {
                 result.x86_32 = true;
             } else if (std.mem.eql(u8, trimmed, "arm64")) {
                 result.arm64 = true;
+            } else if (std.mem.eql(u8, trimmed, "none")) {
+                // Explicitly do nothing - keep all false
             }
         }
         return result;
@@ -42,6 +44,8 @@ pub const OutOptions = struct {
                 result.elf = true;
             } else if (std.mem.eql(u8, trimmed, "img")) {
                 result.img = true;
+            } else if (std.mem.eql(u8, trimmed, "none")) {
+                // Explicitly do nothing - keep all false
             }
         }
         return result;
