@@ -7,22 +7,55 @@ Written for Academic Purposes in AT&T Assembly and Zig 0.15.2
 ## Overview
 
 ArtInitium is a multi-stage bootloader. It is designed to be simple and educational, demonstrating the boot process and basic hardware interactions without relying on complex bootloaders like GRUB.
-The main goal is to be cross_platform to demonstrate Zig's power in this domain, but currently it only supports x86_32. 
+The main goal is to be cross_platform to demonstrate Zig's power in this domain, but currently it only supports x86_32.
 Future plans include adding support for x86_64, ARM 32 and 64 and RISC-V.
-In x86_32 it replaces GRUB for Qemu. 
+In x86_32 it replaces GRUB for QEMU.
 For this architecture it demonstrates the complete boot process from BIOS handoff to protected mode kernel loading.
+
+## Building
+
+The build system has been configured such that any combination of architectures and output file formats can be specified as comma separated lists of options. By default, "none" is selected and so you must specify at least one option for architectures and outputs. See below for the usage
+
+```shell 
+zig build [-Darchitectures=<none|x86_32|arm64|all>] [-Doutputs=<none|elf|bin|img|all>]
+```
+
+Below is an example which will build for all architectures and "install" the images and ELF (containing debug information) files to `zig-out/<ext>/ArtInitium.<arch>.<ext>`. Note that for x86_32 and x86_64 architectures, there will be several binaries and two elfs. This is because those architectures start in a 16-bit only mode (real mode), before progressing to higher levels (such as 32-bit (protected mode) before 64-bit (long mode) for x86_64).
+
+```shell
+zig build -Darchitectures=all -Doutputs=img,elf
+```
+
+Note that if you specify "none,<anything_else>", none will take the lowest precedence, and similarly all will override any speficied option.
+
+## Architecture Naming
+
+ArtInitium uses the following architecture names:
+
+| Name     | Description                                      | QEMU Binary (Ubuntu Noble) |
+|----------|--------------------------------------------------|----------------------------|
+| `x86_32` | i386/i686 family of 32-bit x86 architecture CPUs | `qemu-system-i386`         |
+| `x86_64` | x64/AMD64 family of 64-bit x86 architecture CPUs | `qemu-system-x86_64`       |
+| `arm32`  | Any 32-bit ARM CPU, such as ARMv7-A              | `qemu-system-arm`          |
+| `arm64`  | AArch64 family, i.e. any 64-bit ARM CPU          | `qemu-system-aarch64`      |
+
+I chose these names for clarity and consistency, going against the names used by the big names, such as Linux.
+
+The actual support list for ArtInitium is likely to be very limited, so expect only the default configurations for each QEMU version to be supported, and expect only single CPU and single core operation within this project.
 
 ## ArtInitium for x86_32
 
 ### Architecture for x86_32
 
 #### Stage 1a (512 bytes @ 0x7C00)
+
 - MBR boot sector loaded by BIOS
 - Enables A20 line for >1MB memory access
 - Loads Stage 1b from disk using BIOS INT 13h
 - Jumps to Stage 1b at 0x8000
 
 #### Stage 1b (up to 4KB @ 0x8000)
+
 - **Hello World message** - Displays boot message via BIOS INT 10h
 - **E820 memory map** - Collects system memory layout from BIOS
 - **VGA/VBE detection** - Queries available VBE modes (doesn't set mode yet)
@@ -31,22 +64,29 @@ For this architecture it demonstrates the complete boot process from BIOS handof
 - Jumps to Stage 2 at 0x10000
 
 #### Stage 2 (@ 0x10000 / 64KB)
+
 - 32-bit protected mode code (written in Zig)
 - **Video mode setup** - Uses Bochs VBE extensions to set graphics mode in protected mode
 - Will contain storage drivers (IDE, AHCI, etc.)
 - Loads and launches the kernel
 - Currently: demonstrates video mode switching using boot info from Stage 1b
 
-### Building x86_32
+### Building x86_32 image for qemu
 
-```bash
+```shell
 # Make sure Zig 0.15.2 is in PATH or use the test script
-zig build build_all
+zig build -Darchitectures=x86_32 -Doutputs=img
+```
+
+or if you want to debug etc use
+
+```shell
+zig build -Darchitectures=x86_32 -Doutputs=img,elf
 ```
 
 ### Testing x86_32
 
-```bash
+```shell
 # Run in QEMU with the built image
 ./make_image.sh
 qemu-system-i386 -drive file=artinitium.img,format=raw -serial file:serial.log -serial stdio -s -S -m 2G -no-reboot -no-shutdown
@@ -65,19 +105,24 @@ sudo apt install qemu-system-x86 build-essential
 ### device-tree-compiler (dtc)
 
 I use dtc to compile the image definition into a dtb for parsing with binman. You can install it on Ubuntu with:
+
 ```
 sudo apt install device-tree-compiler
 ```
 
 ### binman from u-boot
+
 For image building, I am using u-boot's [binman](https://docs.u-boot.org/en/latest/develop/package/binman.html) tool. The easiest way to install it on Ubuntu is via pip/pipx:
-```bash
+
+```shell
 pipx install binary-manager
 ```
+
 but there was a dependency or import issue which I fixed on ubuntu with the patch below. If you have the same issue, you can apply the patch below to your pipx installation. The file to patch is likely located at `~/.local/share/pipx/venvs/binary-manager/lib/python3.12/site-packages/binman/control.py` but it may be different based on your python version and pipx configuration.
 
 e.g. command to apply patch:
-```bash
+
+```shell
 patch /home/artiepoole/.local/share/pipx/venvs/binary-manager/lib/python3.12/site-packages/binman/control.py < control_py_fix.patch 
 ```
 
