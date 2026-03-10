@@ -270,12 +270,6 @@ fn setupBuildSteps(b: *std.Build, steps: InstallSteps) void {
 
     const make_image = b.step("make_image", "Assemble disk image using binman");
     make_image.dependOn(build_x86_32);
-
-    const clean_step = b.addRemoveDirTree(b.path("zig-out"));
-    const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
-    const clean = b.step("clean", "Remove build outputs");
-    clean.dependOn(&clean_step.step);
-    clean.dependOn(&clean_cache.step);
 }
 
 /// Create test target to run library unit tests on host

@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 
 // Import build modules
 const options = @import("build/options.zig");
+const common = @import("build/common.zig");
 const x86_32_build = @import("build/x86_32.zig");
 const arm64_build = @import("build/arm64.zig");
 
@@ -43,4 +44,7 @@ pub fn build(b: *std.Build) void {
     if (architectures.arm64) {
         arm64_build.build(b, optimise, output_types);
     }
+
+    // Setup common build steps (clean, etc.)
+    common.setupCommonSteps(b);
 }
