@@ -1,53 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const ArchOptions = struct {
-    x86_32: bool,
-    arm64: bool,
-
-    fn parse(opt: []const u8) ArchOptions {
-        var result = ArchOptions{ .x86_32 = false, .arm64 = false };
-        var it = std.mem.splitScalar(u8, opt, ',');
-        while (it.next()) |token| {
-            const trimmed = std.mem.trim(u8, token, " ");
-            if (std.mem.eql(u8, trimmed, "all")) {
-                result.x86_32 = true;
-                result.arm64 = true;
-            } else if (std.mem.eql(u8, trimmed, "x86_32")) {
-                result.x86_32 = true;
-            } else if (std.mem.eql(u8, trimmed, "arm64")) {
-                result.arm64 = true;
-            }
-        }
-        return result;
-    }
-};
-
-const OutOptions = struct {
-    bin: bool,
-    elf: bool,
-    img: bool,
-
-    fn parse(opt: []const u8) OutOptions {
-        var result = OutOptions{ .bin = false, .elf = false, .img = false };
-        var it = std.mem.splitScalar(u8, opt, ',');
-        while (it.next()) |token| {
-            const trimmed = std.mem.trim(u8, token, " ");
-            if (std.mem.eql(u8, trimmed, "all")) {
-                result.bin = true;
-                result.elf = true;
-                result.img = true;
-            } else if (std.mem.eql(u8, trimmed, "bin")) {
-                result.bin = true;
-            } else if (std.mem.eql(u8, trimmed, "elf")) {
-                result.elf = true;
-            } else if (std.mem.eql(u8, trimmed, "img")) {
-                result.img = true;
-            }
-        }
-        return result;
-    }
-};
+// Import build modules
+const options = @import("build/options.zig");
+const x86_32_build = @import("build/x86_32.zig");
+const arm64_build = @import("build/arm64.zig");
 
 pub fn build(b: *std.Build) void {
     const optimise = b.standardOptimizeOption(.{});
@@ -58,7 +15,7 @@ pub fn build(b: *std.Build) void {
         "Target architectures: x86_32, arm64, or 'all' (default: x86_32)",
     ) orelse "all";
 
-    const architectures = ArchOptions.parse(architectures_option);
+    const architectures = options.ArchOptions.parse(architectures_option);
 
     const output_types_option = b.option(
         []const u8,
@@ -66,7 +23,7 @@ pub fn build(b: *std.Build) void {
         "Output types: bin, elf, img or 'all' (default: all)",
     ) orelse "all";
 
-    const output_types = OutOptions.parse(output_types_option);
+    const output_types = options.OutOptions.parse(output_types_option);
 
     const arm64_target = b.resolveTargetQuery(.{
         .cpu_arch = .aarch64,
@@ -78,249 +35,12 @@ pub fn build(b: *std.Build) void {
 
     // Build x86_32 if requested
     if (architectures.x86_32) {
-        buildX86(b, optimise, output_types);
+        x86_32_build.build(b, optimise, output_types);
+        x86_32_build.buildTests(b);
     }
 
     // Build ARM64 if requested
     if (architectures.arm64) {
-        buildArm64(b, optimise, output_types);
+        arm64_build.build(b, optimise, output_types);
     }
-}
-
-/// Tree for build_x86_32 target:
-/// build_x86_32
-/// ├── step_16
-/// │   ├── install_binary_16
-/// │   ├── install_elf_16
-/// │   ├── install_stage1a
-/// │   └── install_stage1b
-/// ├── elf_32
-/// │   └── install_elf_32
-/// ├── step_32
-/// │   └── install_binary_32
-/// └── install_image
-///     └── binman
-///         ├── dtc
-///         ├── stage1a_bin (dirname)
-///         ├── stage1b_bin (dirname)
-///         └── binary_32_output (dirname)
-fn buildX86(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: OutOptions) void {
-    const out_bin = output_types.bin;
-    const out_elf = output_types.elf;
-    const out_img = output_types.img;
-
-    const target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86,
-        .os_tag = .freestanding,
-        .cpu_model = .{ .explicit = &std.Target.x86.cpu.i386 },
-    });
-
-    // ---------------------------------------------------------------
-    // Build 16-bit binary
-    // ---------------------------------------------------------------
-
-    // Define the custom AS calls and their output object files
-    const assemble_stage1a = b.addSystemCommand(&.{
-        "as",
-        "--32",
-        "src/real_mode/x86_32/stage1a.S",
-        "-o",
-    });
-    const assemble_stage1b = b.addSystemCommand(&.{
-        "as",
-        "--32",
-        "src/real_mode/x86_32/stage1b.S",
-        "-o",
-    });
-    const stage1a_obj = assemble_stage1a.addOutputFileArg("stage1a.o");
-    const stage1b_obj = assemble_stage1b.addOutputFileArg("stage1b.o");
-
-    // Define the executable as a linked target which zig should build - creates automatic output names etc
-    const real_mode_module = b.createModule(.{ .target = target, .optimize = optimise });
-    const real_mode_exe = b.addExecutable(.{ .name = "ArtInitium.16.x86_32.elf", .root_module = real_mode_module });
-    real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
-    real_mode_exe.addObjectFile(stage1a_obj);
-    real_mode_exe.addObjectFile(stage1b_obj);
-
-    // Extract stage1a (MBR, first 512 bytes) from the linked ELF by section
-    const objcopy_stage1a = b.addSystemCommand(&.{
-        "objcopy", "--only-section=.stage1a", "-O", "binary",
-    });
-    objcopy_stage1a.addArtifactArg(real_mode_exe);
-    const stage1a_bin = objcopy_stage1a.addOutputFileArg("ArtInitium.16.x86_32.a");
-
-    // Extract stage1b (real-mode loader) from the linked ELF by section
-    const objcopy_stage1b = b.addSystemCommand(&.{
-        "objcopy", "--only-section=.stage1b", "-O", "binary",
-    });
-    objcopy_stage1b.addArtifactArg(real_mode_exe);
-    const stage1b_bin = objcopy_stage1b.addOutputFileArg("ArtInitium.16.x86_32.b");
-
-    // Also produce the combined flat binary (stage1a + stage1b) for reference
-    const objcopy_16 = b.addSystemCommand(&.{
-        "objcopy", "-O", "binary",
-    });
-    objcopy_16.addArtifactArg(real_mode_exe);
-    const binary_16_output = objcopy_16.addOutputFileArg("ArtInitium.16.x86_32");
-
-    const install_stage1a = if (out_bin) b.addInstallFile(stage1a_bin, "bin/ArtInitium.16.x86_32.a") else null;
-    const install_stage1b = if (out_bin) b.addInstallFile(stage1b_bin, "bin/ArtInitium.16.x86_32.b") else null;
-    const install_binary_16 = if (out_bin) b.addInstallFile(binary_16_output, "bin/ArtInitium.16.x86_32") else null;
-    const install_elf_16 = if (out_elf) b.addInstallArtifact(real_mode_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
-
-    // ---------------------------------------------------------------
-    // Build 32-bit binaries
-    // ---------------------------------------------------------------
-
-    // Define the libary module which contains all shared code
-    const artlib_mod = b.addModule("artlib", .{
-        .root_source_file = b.path("src/lib/root.zig"),
-        .target = target,
-    });
-
-    // Define the protected mode executable elf file
-    const elf_32_mod = b.createModule(
-        .{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimise,
-            .imports = &.{
-                .{
-                    .name = "artlib",
-                    .module = artlib_mod,
-                },
-            },
-        },
-    );
-    const elf_32_exe = b.addExecutable(
-        .{
-            .name = "ArtInitium.32.x86_32.elf",
-            .root_module = elf_32_mod,
-        },
-    );
-
-    // use the custom linker script to load in at 64KB
-    elf_32_exe.linker_script = b.path("linker_scripts/x86_32/protected_mode.ld");
-
-    // Extract the binary executable from the elf for use in the image
-    const objcopy_32 = b.addSystemCommand(&.{
-        "objcopy",
-        "-O",
-        "binary",
-    });
-    objcopy_32.addArtifactArg(elf_32_exe);
-    const binary_32_output = objcopy_32.addOutputFileArg("ArtInitium.32.x86_32");
-
-    // ---------------------------------------------------------------
-    // Specify install targets so that files appear in zig-out/bin
-    // ---------------------------------------------------------------
-    const install_elf_32 = if (out_elf) b.addInstallArtifact(elf_32_exe, .{ .dest_dir = .{ .override = .{ .custom = "elf" } } }) else null;
-    const install_binary_32 = if (out_bin) b.addInstallFile(binary_32_output, "bin/ArtInitium.32.x86_32") else null;
-
-    // ---------------------------------------------------------------
-    // Assemble disk image using dtc + binman
-    // ---------------------------------------------------------------
-
-    // Compile the .its to a .dtb
-    const dtc = b.addSystemCommand(&.{
-        "dtc",
-        "-I", "dts",
-        "-O", "dtb",
-        "-o",
-    });
-    const dtb_output = dtc.addOutputFileArg("artinium_x86_32.dtb");
-    dtc.addArg("image_layouts/artinium_x86_32.its");
-
-    // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
-    const binman = b.addSystemCommand(&.{ "binman", "build", "-d" });
-    binman.addFileArg(dtb_output);
-    // Pass the directories containing each artifact as -I so binman can find them by filename
-    binman.addArg("-I");
-    binman.addDirectoryArg(stage1a_bin.dirname());
-    binman.addArg("-I");
-    binman.addDirectoryArg(stage1b_bin.dirname());
-    binman.addArg("-I");
-    binman.addDirectoryArg(binary_32_output.dirname());
-    // Capture output directory as a zig-tracked path
-    binman.addArg("-O");
-    const image_out_dir = binman.addOutputDirectoryArg("binman_out");
-
-    // Reference the image file within the tracked output directory
-    const image_file = image_out_dir.path(b, "artinitium.x86_32.img");
-    const install_image = if (out_img) b.addInstallFile(image_file, "img/artinitium.x86_32.img") else null;
-
-    // ---------------------------------------------------------------
-    // Define `zig build [target]` targets
-    // ---------------------------------------------------------------
-
-    const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
-    if (install_binary_16) |s| step_16.dependOn(&s.step);
-    if (install_elf_16) |s| step_16.dependOn(&s.step);
-    if (install_stage1a) |s| step_16.dependOn(&s.step);
-    if (install_stage1b) |s| step_16.dependOn(&s.step);
-
-    // Build the 32-bit executable as an elf file so that we can use it for debugging purposes.
-    const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
-    if (install_elf_32) |s| elf_32.dependOn(&s.step);
-
-    const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
-    if (install_binary_32) |s| step_32.dependOn(&s.step);
-
-    // Default to build all x86_32 targets
-    const build_x86_32 = b.step("build_x86_32", "Build all x86_32 binaries");
-    b.default_step = build_x86_32;
-
-    build_x86_32.dependOn(step_16);
-    build_x86_32.dependOn(elf_32);
-    build_x86_32.dependOn(step_32);
-    if (install_image) |s| build_x86_32.dependOn(&s.step);
-
-    const make_image = b.step("make_image", "Assemble disk image using binman");
-    make_image.dependOn(build_x86_32);
-
-    const clean_step = b.addRemoveDirTree(b.path("zig-out"));
-    const clean_cache = b.addRemoveDirTree(b.path(".zig-cache"));
-    const clean = b.step("clean", "Remove build outputs");
-    clean.dependOn(&clean_step.step);
-    clean.dependOn(&clean_cache.step);
-
-    // ---------------------------------------------------------------
-    // Create test target to run library Unit tests on host
-    // ---------------------------------------------------------------
-    const host_target = b.standardTargetOptions(.{});
-    const artlib_test_mod = b.createModule(.{
-        .root_source_file = b.path("src/lib/root.zig"),
-        .target = host_target,
-    });
-
-    const mod_tests = b.addTest(.{
-        .root_module = artlib_test_mod,
-        .use_llvm = true,
-        .use_lld = true,
-    });
-
-    const install_mod_tests = b.addInstallArtifact(
-        mod_tests,
-        .{
-            .dest_dir = .{
-                .override = .{
-                    .custom = "test_artlib",
-                },
-            },
-        },
-    );
-
-    const mod_tests_step = b.step("test_artlib", "Create test binaries for debugging 'root'");
-    mod_tests_step.dependOn(&install_mod_tests.step);
-}
-
-fn buildArm64(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: OutOptions) void {
-    std.debug.print(
-        "We cannot build for arm64 yet, sorry.\n",
-        .{},
-    );
-    _ = b;
-    _ = optimise;
-    _ = output_types;
-    return;
 }
