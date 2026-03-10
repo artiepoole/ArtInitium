@@ -32,18 +32,22 @@ Note that if you specify "none,<anything_else>", none will take the lowest prece
 
 ArtInitium uses the following architecture names:
 
-| Name     | Description                                      | QEMU Binary (Ubuntu Noble) |
-|----------|--------------------------------------------------|----------------------------|
-| `x86_32` | i386/i686 family of 32-bit x86 architecture CPUs | `qemu-system-i386`         |
-| `x86_64` | x64/AMD64 family of 64-bit x86 architecture CPUs | `qemu-system-x86_64`       |
-| `arm32`  | Any 32-bit ARM CPU, such as ARMv7-A              | `qemu-system-arm`          |
-| `arm64`  | AArch64 family, i.e. any 64-bit ARM CPU          | `qemu-system-aarch64`      |
+| Name      | Description                                      | QEMU Binary (Ubuntu Noble) |
+|-----------|--------------------------------------------------|----------------------------|
+| `x86_32`  | i386/i686 family of 32-bit x86 architecture CPUs | `qemu-system-i386`         |
+| `x86_64`  | x64/AMD64 family of 64-bit x86 architecture CPUs | `qemu-system-x86_64`       |
+| `arm32`   | Any 32-bit ARM CPU, such as ARMv7-A              | `qemu-system-arm`          |
+| `arm64`   | AArch64 family, i.e. any 64-bit ARM CPU          | `qemu-system-aarch64`      |
+| `riscv32` | 32-bit RISC-V (RV32)                             | `qemu-system-riscv32`      |
+| `riscv64` | 64-bit RISC-V (RV64)                             | `qemu-system-riscv64`      |
 
-I chose these names for clarity and consistency, going against the names used by the big names, such as Linux.
+I chose these names for clarity and consistency, going against the names used by the big players, such as Linux.
 
 The actual support list for ArtInitium is likely to be very limited, so expect only the default configurations for each QEMU version to be supported, and expect only single CPU and single core operation within this project.
 
 ## ArtInitium for x86_32
+
+The x86_32 architecture implementation is as minimal as possible, with no intention to implement sophisticated features. This is because the author has "been there, done that, got the job". See [ArtOS](https://github.com/artiepoole/artos) for more on that.
 
 ### Architecture for x86_32
 
@@ -169,3 +173,14 @@ diff --git a/../../.local/share/pipx/venvs/binary-manager/lib/python3.12/site-pa
 ```
 
 </details>
+
+## ArtInitium for Arm
+
+There are currently no plans to support custom feature sets of Arm CPUs at the time of writing. 
+The most "default" configuration will be used to launch the QEMU instance, and this is what will be supported.
+
+## ArtInitium for riscv
+
+There is a plan to have a fully customisable system where features can be toggled on and off using zig CPU features support. 
+These will be passed either as additional arguments to the build call, or there will be some other config system at play.
+This is not going to be done for a long time. Until then, even floating points will not be supported until absolutely necessary.
