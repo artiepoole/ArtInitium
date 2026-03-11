@@ -1,14 +1,12 @@
-# ArtInitium
+# ArtInitium - Custom Bootloader for QEMU
 
-Custom x86_32 Bootloader for QEMU - A GRUB Replacement
-
-Written for Academic Purposes in AT&T Assembly and Zig 0.15.2
+Written for academic purposes in Zig 0.15.2 and various forms of assembly.
 
 ## Overview
 
 ArtInitium is a multi-stage bootloader. It is designed to be simple and educational, demonstrating the boot process and basic hardware interactions without relying on complex bootloaders like GRUB.
 The main goal is to be cross_platform to demonstrate Zig's power in this domain, but currently it only supports x86_32.
-Future plans include adding support for x86_64, ARM 32 and 64 and RISC-V.
+Future plans include adding support for x86_64, ARM 32, ARM 64 and RISC-V.
 In x86_32 it replaces GRUB for QEMU.
 For this architecture it demonstrates the complete boot process from BIOS handoff to protected mode kernel loading.
 
