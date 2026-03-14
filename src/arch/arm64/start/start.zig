@@ -4,13 +4,6 @@
 
 const std = @import("std");
 
-/// Called by _start after EL transition, stack setup and BSS zeroing.
-/// x0 holds the DTB pointer passed by QEMU — save it before doing anything.
-pub export fn arm64_main() callconv(.c) noreturn {
-    // TODO: initialise platform, parse DTB, hand off to main kernel stage
-    while (true) {}
-}
-
 /// Entry point - must be the first symbol in the binary
 /// QEMU virt machine jumps here after "BIOS" initialisation
 pub export fn _start() callconv(.naked) noreturn {
@@ -67,7 +60,7 @@ pub export fn _start() callconv(.naked) noreturn {
         \\.bss_done:
 
     // Jump to the Zig main stage function
-        \\  bl arm64_main
+        \\  bl ArtInitium_entry
 
     // Should never return, but park if it does
         \\.park:

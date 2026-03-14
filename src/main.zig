@@ -14,6 +14,6 @@ pub const init = switch (builtin.cpu.arch) {
     else => @compileError("Unsupported architecture for terminal"),
 };
 
-pub export fn Artinitium_entry(arg: usize) linksection(".text.entry") callconv(.c) noreturn {
+pub export fn ArtInitium_entry(arg: usize) linksection(".text.entry") callconv(.c) noreturn {
     init.init(arg);
 }
