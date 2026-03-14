@@ -4,7 +4,7 @@
  * Copyright (c) 2026 Artie Poole */
 
 OUTPUT_ARCH(i386)
-OUTPUT_FORMAT("binary")        /* produce a flat binary, not ELF */
+OUTPUT_FORMAT(elf32-i386)      /* ELF output so objcopy can extract sections */
 ENTRY(__stage_1a_start)                  /* entry point symbol from boot.s */
 
 MEMORY

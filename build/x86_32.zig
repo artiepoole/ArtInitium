@@ -1,0 +1,333 @@
+const std = @import("std");
+const options = @import("options.zig");
+
+const RealModeArtifacts = struct {
+    elf_16_exe: *std.Build.Step.Compile,
+    bin_16a: std.Build.LazyPath,
+    bin_16b: std.Build.LazyPath,
+};
+const ProtectedModeArtifacts = struct {
+    elf_32_exe: *std.Build.Step.Compile,
+    bin_32: std.Build.LazyPath,
+};
+
+const InstallSteps = struct {
+    install_elf_16: ?*std.Build.Step.InstallArtifact,
+    install_elf_32: ?*std.Build.Step.InstallArtifact,
+    install_bin_16a: ?*std.Build.Step.InstallFile,
+    install_bin_16b: ?*std.Build.Step.InstallFile,
+    install_bin_32: ?*std.Build.Step.InstallFile,
+    install_image: ?*std.Build.Step.InstallFile,
+};
+
+/// Build x86_32 targets including 16-bit, 32-bit binaries and bootable qemu disk image
+///
+/// Because of x86 build process, the 16-bit binaries must be build using gcc and manual ld calls
+/// (to enable 16-bit flags which zig doesn't support). Because the size of stage1b determines how
+/// much stage1a needs to load, the linker is used to link both stage1a and stage1b together into
+/// an ELF, and then objcopy is used to extract the two binaries by section. The section-by-section
+/// extraction is necessary because the binary needs to have stage1b directly after stage1a at load
+/// time, and the objcopy output has a 512b padding which I could not remove, and binman
+/// expects the size of stage1a to be exactly 0x200 in size, so this makes it easier to call
+/// binman.
+///
+/// The 32-bit binary can be built directly using zig, and the linker *could* specify to build a
+/// flat binary, but we want the ELF with symbols for debugging so we build that and extract the
+/// binary using `objcopy`.
+///
+/// Finally, dtc and binman are used to assemble the final disk image, with zig-tracked paths
+/// passed as inputs and outputs so that zig can track dependencies and clean outputs correctly.
+///
+/// Tree for build_x86_32 target:
+/// build_x86_32
+/// ├── ArtInitium.16 (step_16)
+/// │   ├── install_elf_16
+/// │   ├── install_bin_16a
+/// │   └── install_bin_16b
+/// ├── ArtInitium.32.elf (elf_32)
+/// │   └── install_elf_32
+/// ├── ArtInitium.32 (step_32)
+/// │   └── install_bin_32
+/// ├── make_image
+/// └── install_image
+///     └── binman
+///         ├── dtc
+///         ├── bin_16a (dirname)
+///         ├── bin_16b (dirname)
+///         └── bin_32 (dirname)
+pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: options.OutOptions) void {
+    const out_bin = output_types.bin;
+    const out_elf = output_types.elf;
+    const out_img = output_types.img;
+
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86,
+        .os_tag = .freestanding,
+        .cpu_model = .{ .explicit = &std.Target.x86.cpu.i386 },
+    });
+
+    // ---------------------------------------------------------------
+    // Build 16-bit binary
+    // ---------------------------------------------------------------
+    const real_mode_artifacts = build16BitBinaries(b, optimise, target);
+
+    const install_bin_16a = if (out_bin)
+        b.addInstallFile(real_mode_artifacts.bin_16a, "bin/ArtInitium.16.x86_32.a")
+    else
+        null;
+
+    const install_bin_16b = if (out_bin)
+        b.addInstallFile(real_mode_artifacts.bin_16b, "bin/ArtInitium.16.x86_32.b")
+    else
+        null;
+
+    const install_elf_16 = if (out_elf)
+        b.addInstallArtifact(real_mode_artifacts.elf_16_exe, .{
+            .dest_dir = .{ .override = .{ .custom = "elf" } },
+        })
+    else
+        null;
+
+    // ---------------------------------------------------------------
+    // Build 32-bit binaries
+    // ---------------------------------------------------------------
+    const protected_mode_artifacts = build32BitBinaries(b, optimise, target);
+
+    const install_elf_32 = if (out_elf)
+        b.addInstallArtifact(protected_mode_artifacts.elf_32_exe, .{
+            .dest_dir = .{ .override = .{ .custom = "elf" } },
+        })
+    else
+        null;
+
+    const install_bin_32 = if (out_bin)
+        b.addInstallFile(protected_mode_artifacts.bin_32, "bin/ArtInitium.32.x86_32")
+    else
+        null;
+
+    // ---------------------------------------------------------------
+    // Assemble disk image using dtc + binman
+    // ---------------------------------------------------------------
+    const image_file = buildDiskImage(
+        b,
+        real_mode_artifacts.bin_16a,
+        real_mode_artifacts.bin_16b,
+        protected_mode_artifacts.bin_32,
+    );
+    const install_image = if (out_img)
+        b.addInstallFile(image_file, "img/ArtInitium.x86_32.img")
+    else
+        null;
+
+    // ---------------------------------------------------------------
+    // Define `zig build [target]` targets
+    // ---------------------------------------------------------------
+    setupBuildSteps(
+        b,
+        .{
+            .install_bin_16a = install_bin_16a,
+            .install_bin_16b = install_bin_16b,
+            .install_bin_32 = install_bin_32,
+            .install_elf_16 = install_elf_16,
+            .install_elf_32 = install_elf_32,
+            .install_image = install_image,
+        },
+    );
+}
+
+/// Build 16-bit real mode binaries (stage1a MBR, stage1b loader)
+fn build16BitBinaries(
+    b: *std.Build,
+    optimise: std.builtin.OptimizeMode,
+    target: std.Build.ResolvedTarget,
+) RealModeArtifacts {
+    // Define the custom AS calls and their output object files
+    const assemble_stage1a = b.addSystemCommand(&.{
+        "as",
+        "--32",
+        "src/real_mode/x86_32/stage1a.S",
+        "-o",
+    });
+    const assemble_stage1b = b.addSystemCommand(&.{
+        "as",
+        "--32",
+        "src/real_mode/x86_32/stage1b.S",
+        "-o",
+    });
+    const stage1a_obj = assemble_stage1a.addOutputFileArg("stage1a.o");
+    const stage1b_obj = assemble_stage1b.addOutputFileArg("stage1b.o");
+
+    // Define the executable as a linked target which zig should build
+    const real_mode_module = b.createModule(.{
+        .target = target,
+        .optimize = optimise,
+    });
+    const real_mode_exe = b.addExecutable(.{
+        .name = "ArtInitium.16.x86_32.elf",
+        .root_module = real_mode_module,
+    });
+    real_mode_exe.setLinkerScript(b.path("linker_scripts/x86_32/real_mode.ld"));
+    real_mode_exe.addObjectFile(stage1a_obj);
+    real_mode_exe.addObjectFile(stage1b_obj);
+
+    // Extract stage1a (MBR, first 512 bytes) from the linked ELF by section
+    const objcopy_stage1a = b.addSystemCommand(&.{
+        "objcopy", "--only-section=.stage1a", "-O", "binary",
+    });
+    objcopy_stage1a.addArtifactArg(real_mode_exe);
+    const stage1a_bin = objcopy_stage1a.addOutputFileArg("ArtInitium.16.x86_32.a");
+
+    // Extract stage1b (real-mode loader) from the linked ELF by section
+    const objcopy_stage1b = b.addSystemCommand(&.{
+        "objcopy", "--only-section=.stage1b", "-O", "binary",
+    });
+    objcopy_stage1b.addArtifactArg(real_mode_exe);
+    const stage1b_bin = objcopy_stage1b.addOutputFileArg("ArtInitium.16.x86_32.b");
+
+    return .{
+        .elf_16_exe = real_mode_exe,
+        .bin_16a = stage1a_bin,
+        .bin_16b = stage1b_bin,
+    };
+}
+
+/// Build 32-bit protected mode binaries
+fn build32BitBinaries(
+    b: *std.Build,
+    optimise: std.builtin.OptimizeMode,
+    target: std.Build.ResolvedTarget,
+) ProtectedModeArtifacts {
+    // Define the library module which contains all shared code
+    const artlib_mod = b.addModule("artlib", .{
+        .root_source_file = b.path("src/lib/root.zig"),
+        .target = target,
+    });
+
+    // Define the protected mode executable elf file
+    const elf_32_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimise,
+        .imports = &.{
+            .{
+                .name = "artlib",
+                .module = artlib_mod,
+            },
+        },
+    });
+    const elf_32_exe = b.addExecutable(.{
+        .name = "ArtInitium.32.x86_32.elf",
+        .root_module = elf_32_mod,
+    });
+
+    // Use the custom linker script to load in at 64KB
+    elf_32_exe.linker_script = b.path("linker_scripts/x86_32/protected_mode.ld");
+
+    // Extract the binary executable from the elf for use in the image
+    const objcopy_32 = b.addSystemCommand(&.{
+        "objcopy",
+        "-O",
+        "binary",
+    });
+    objcopy_32.addArtifactArg(elf_32_exe);
+    const bin_32 = objcopy_32.addOutputFileArg("ArtInitium.32.x86_32");
+
+    return .{
+        .elf_32_exe = elf_32_exe,
+        .bin_32 = bin_32,
+    };
+}
+
+/// Build disk image using dtc and binman
+fn buildDiskImage(
+    b: *std.Build,
+    stage1a_bin: std.Build.LazyPath,
+    stage1b_bin: std.Build.LazyPath,
+    binary_32_output: std.Build.LazyPath,
+) std.Build.LazyPath {
+    // Compile the .its to a .dtb
+    const dtc = b.addSystemCommand(&.{
+        "dtc",
+        "-I",
+        "dts",
+        "-O",
+        "dtb",
+        "-o",
+    });
+    const dtb_output = dtc.addOutputFileArg("ArtInitium_x86_32.dtb");
+    dtc.addArg("image_layouts/ArtInitium.x86_32.its");
+
+    // Run binman with the compiled .dtb, passing zig-tracked artifact dirs as inputs
+    const binman = b.addSystemCommand(&.{
+        "binman",
+        "build",
+        "-d",
+    });
+    binman.addFileArg(dtb_output);
+    // Pass the directories containing each artifact as -I so binman can find them by filename
+    binman.addArg("-I");
+    binman.addDirectoryArg(stage1a_bin.dirname());
+    binman.addArg("-I");
+    binman.addDirectoryArg(stage1b_bin.dirname());
+    binman.addArg("-I");
+    binman.addDirectoryArg(binary_32_output.dirname());
+    // Capture output directory as a zig-tracked path
+    binman.addArg("-O");
+    const image_out_dir = binman.addOutputDirectoryArg("binman_out");
+
+    // Reference the image file within the tracked output directory
+    return image_out_dir.path(b, "ArtInitium.x86_32.img");
+}
+
+/// Setup all build step targets
+fn setupBuildSteps(b: *std.Build, steps: InstallSteps) void {
+    const step_16 = b.step("ArtInitium.16", "Build 16-bit binary");
+    if (steps.install_elf_16) |s| step_16.dependOn(&s.step);
+    if (steps.install_bin_16a) |s| step_16.dependOn(&s.step);
+    if (steps.install_bin_16b) |s| step_16.dependOn(&s.step);
+
+    // Build the 32-bit executable as an elf file so that we can use it for debugging purposes.
+    const elf_32 = b.step("ArtInitium.32.elf", "Build 32-bit binary");
+    if (steps.install_elf_32) |s| elf_32.dependOn(&s.step);
+
+    const step_32 = b.step("ArtInitium.32", "Build 32-bit raw binary");
+    if (steps.install_bin_32) |s| step_32.dependOn(&s.step);
+
+    // Default to build all x86_32 targets
+    const build_x86_32 = b.step("build_x86_32", "Build all x86_32 binaries");
+    b.default_step = build_x86_32;
+
+    build_x86_32.dependOn(step_16);
+    build_x86_32.dependOn(elf_32);
+    build_x86_32.dependOn(step_32);
+    if (steps.install_image) |s| build_x86_32.dependOn(&s.step);
+
+    const make_image = b.step("make_image", "Assemble disk image using binman");
+    make_image.dependOn(build_x86_32);
+}
+
+/// Create test target to run library unit tests on host
+pub fn buildTests(b: *std.Build) void {
+    const host_target = b.standardTargetOptions(.{});
+    const artlib_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/lib/root.zig"),
+        .target = host_target,
+    });
+
+    const mod_tests = b.addTest(.{
+        .root_module = artlib_test_mod,
+        .use_llvm = true,
+        .use_lld = true,
+    });
+
+    const install_mod_tests = b.addInstallArtifact(mod_tests, .{
+        .dest_dir = .{
+            .override = .{
+                .custom = "test_artlib",
+            },
+        },
+    });
+
+    const mod_tests_step = b.step("test_artlib", "Create test binaries for debugging 'root'");
+    mod_tests_step.dependOn(&install_mod_tests.step);
+}

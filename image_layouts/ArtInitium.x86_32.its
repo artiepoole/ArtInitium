@@ -1,0 +1,51 @@
+// ArtInitium - MultiArch Bootloader for QEMU
+//
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Artie Poole
+//
+// Binman image description for ArtInitium bootloader disk image.
+// Assembles the final artinitium.img from the two build outputs.
+//
+// Layout:
+//   0x000000 (sector 0):    Stage 1a MBR - first 512 bytes of ArtInitium.16.x86_32
+//   0x000200 (sector 1):    Stage 1b     - ArtInitium.16.x86_32.b
+//   0x000200+N (sector 1+N): Stage 2     - ArtInitium.32.x86_32, sector-aligned after stage1b
+//
+// Build with:
+//   dtc -I dts -O dtb -o artinitium.dtb artinitium.its
+//   binman build -d artinitium.dtb -I . -O .
+
+/dts-v1/;
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	binman {
+		filename = "ArtInitium.x86_32.img";
+		size = <0xa00000>; /* 10 MB */
+		fill-byte = [00];
+
+		/* Stage 1a: MBR boot sector - first 512 bytes of the 16-bit real-mode binary */
+		stage1a {
+			type = "blob-ext";
+			filename = "ArtInitium.16.x86_32.a";
+			offset = <0x000000>;
+		};
+
+		/* Stage 1b: real-mode loader */
+		stage1b {
+			type = "blob-ext";
+			filename = "ArtInitium.16.x86_32.b";
+			offset = <0x000200>;     /* sector 1 on disk */
+		};
+
+		/* Stage 2: 32-bit protected-mode binary.
+		 * Placed immediately after stage1b, aligned to a sector boundary. */
+		stage2 {
+			type = "blob-ext";
+			filename = "ArtInitium.32.x86_32";
+			align = <0x200>;         /* align to 512-byte sector boundary */
+		};
+	};
+};
