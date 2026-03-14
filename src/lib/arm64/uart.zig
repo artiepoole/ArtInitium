@@ -7,7 +7,6 @@
 /// Base address from DTS: pl011@9000000
 /// Ref: ARM PrimeCell UART (PL011) Technical Reference Manual
 /// https://developer.arm.com/documentation/ddi0183/latest/
-
 const PL011_BASE: usize = 0x9000000;
 
 /// PL011 register map, laid out exactly as the hardware MMIO space.
@@ -16,34 +15,47 @@ const PL011_BASE: usize = 0x9000000;
 ///   regs.dr = 'A';   // transmit
 ///   _ = regs.fr;     // read flags
 const PrimeCellRegisters = extern struct {
-    dr: u32,        // 0x000 Data Register
-    rsr: u32,       // 0x004 Receive Status / Error Clear
-    _pad0: [4]u32,  // 0x008-0x014 reserved
-    fr: u32,        // 0x018 Flag Register
-    _pad1: u32,     // 0x01C reserved
-    ilpr: u32,      // 0x020 IrDA Low-Power Counter
-    ibrd: u32,      // 0x024 Integer Baud Rate Divisor
-    fbrd: u32,      // 0x028 Fractional Baud Rate Divisor
-    lcr_h: u32,     // 0x02C Line Control Register
-    cr: u32,        // 0x030 Control Register
-    ifls: u32,      // 0x034 Interrupt FIFO Level Select
-    imsc: u32,      // 0x038 Interrupt Mask Set/Clear
+    dr: u32, // 0x000 Data Register
+    rsr: u32, // 0x004 Receive Status / Error Clear
+    _pad0: [4]u32, // 0x008-0x014 reserved
+    fr: u32, // 0x018 Flag Register
+    _pad1: u32, // 0x01C reserved
+    ilpr: u32, // 0x020 IrDA Low-Power Counter
+    ibrd: u32, // 0x024 Integer Baud Rate Divisor
+    fbrd: u32, // 0x028 Fractional Baud Rate Divisor
+    lcr_h: u32, // 0x02C Line Control Register
+    cr: u32, // 0x030 Control Register
+    ifls: u32, // 0x034 Interrupt FIFO Level Select
+    imsc: u32, // 0x038 Interrupt Mask Set/Clear
 };
 
-// Flag Register bits
-const FR_TXFF: u32 = 1 << 5; // TX FIFO full
-const FR_BUSY: u32 = 1 << 3; // UART busy transmitting
+/// Register bit definitions, grouped by register.
+/// Use as: FR.BUSY, CR.TXE, LCR_H.FEN, etc.
+/// Flag Register (FR) bits
+const FR = struct {
+    const TXFF: u32 = 1 << 5; // TX FIFO full
+    const BUSY: u32 = 1 << 3; // UART busy transmitting
+};
 
-// Control Register bits
-const CR_UARTEN: u32 = 1 << 0; // UART enable
-const CR_TXE: u32 = 1 << 8;    // TX enable
-const CR_RXE: u32 = 1 << 9;    // RX enable
+/// Control Register (CR) bits
+const CR = struct {
+    const UARTEN: u32 = 1 << 0; // UART enable
+    const TXE: u32 = 1 << 8; // TX enable
+    const RXE: u32 = 1 << 9; // RX enable
+};
 
-// Line Control Register bits
-const LCR_H_FEN: u32 = 1 << 4;     // FIFO enable
-const LCR_H_WLEN_8: u32 = 0b11 << 5; // 8-bit word length
+/// Line Control Register (LCR_H) bits
+const LCR_H = struct {
+    const FEN: u32 = 1 << 4; // FIFO enable
+    const WLEN_8: u32 = 0b11 << 5; // 8-bit word length for ascii
+};
 
-/// PL011 UART driver. Holds a volatile pointer to the MMIO register block.
+/// Interrupt Mask Set/Clear (IMSC) bits
+const IMSC = struct {
+    const RXIM: u32 = 1 << 4; // RX interrupt mask
+    const TXIM: u32 = 1 << 5; // TX interrupt mask
+};
+
 pub const PrimeCell = struct {
     regs: *volatile PrimeCellRegisters,
 
@@ -59,7 +71,7 @@ pub const PrimeCell = struct {
         self.regs.cr = 0;
 
         // Wait for any ongoing transmission to finish
-        while (self.regs.fr & FR_BUSY != 0) {}
+        while (self.regs.fr & FR.BUSY != 0) {}
 
         // Flush TX FIFO by clearing FEN
         self.regs.lcr_h = 0;
@@ -68,19 +80,19 @@ pub const PrimeCell = struct {
         self.regs.ibrd = 13;
         self.regs.fbrd = 1;
 
-        // 8-bit, no parity, 1 stop bit, FIFO enabled
-        self.regs.lcr_h = LCR_H_WLEN_8 | LCR_H_FEN;
+        // 8-bit words, no parity, 1 stop bit, FIFO enabled
+        self.regs.lcr_h = LCR_H.WLEN_8 | LCR_H.FEN;
 
         // Mask all interrupts
         self.regs.imsc = 0;
 
-        // Enable UART, TX and RX
-        self.regs.cr = CR_UARTEN | CR_TXE | CR_RXE;
+        // Enable UART, TX and RX (RX does nothing if serial is a file - works for stdio)
+        self.regs.cr = CR.UARTEN | CR.TXE | CR.RXE;
     }
 
     /// Block until the TX FIFO has space, then write one byte.
     pub fn putc(self: PrimeCell, c: u8) void {
-        while (self.regs.fr & FR_TXFF != 0) {
+        while (self.regs.fr & FR.TXFF != 0) {
             asm volatile ("yield");
         }
         self.regs.dr = c;
@@ -92,15 +104,45 @@ pub const PrimeCell = struct {
             self.putc(c);
         }
     }
+
+    /// Register the RX interrupt handler.
+    ///
+    /// TODO: wire `handler` into the GIC (Generic Interrupt Controller):
+    ///   1. Configure GIC distributor to enable UART SPI (IRQ 33 on QEMU virt).
+    ///   2. Configure GIC CPU interface to accept the priority.
+    ///   3. Install `handler` into the exception vector table (EL1 IRQ entry).
+    ///   4. Enable IRQs at the CPU: `msr daifclr, #2`
+    ///
+    /// Note: the handler signature is a placeholder. It will likely
+    /// receive a slice, as the interrupt handler should drain the full RX FIFO.
+    pub fn register_rx_handler(self: PrimeCell, handler: *const fn (byte: []const u8) void) void {
+        _ = self;
+        _ = handler; // TODO: register with GIC / exception vector table
+    }
+
+    /// Unmask the RX interrupt. Call register_rx_handler first.
+    pub fn enable_rx_interrupt(self: PrimeCell) void {
+        self.regs.imsc = self.regs.imsc | IMSC.RXIM;
+    }
+
+    /// Mask the RX interrupt without deregistering the handler.
+    pub fn disable_rx_interrupt(self: PrimeCell) void {
+        self.regs.imsc = self.regs.imsc & ~IMSC.RXIM;
+    }
 };
 
 /// The single early-boot UART instance.
 var uart: PrimeCell = PrimeCell.init(PL011_BASE);
 
+/// Early init function to set up the UART for use by ArtInitium's early print macros.
+/// The UART will be reconfigured later during driving probing/initialisation
 pub fn early_init() !void {
     uart.setup();
 }
 
+/// Early write function for ArtInitium's early print macros. Writes the given data to the UART.
+/// Note that later writes could use DMA, but this is unlikely to be worth the complexity for a
+///  simple bootloader, and the PL011 doesn't support it anyway.
 pub fn early_write(data: []const u8) !void {
     uart.puts(data);
 }
