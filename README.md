@@ -26,7 +26,7 @@ Below is an example which will build for all architectures and "install" the ima
 zig build -Darchitectures=all -Doutputs=img,elf
 ```
 
-Note that if you specify "none,<anything_else>", none will take the lowest precedence, and similarly all will override any speficied option.
+Note that if you specify "none,<anything_else>", none will take the lowest precedence, and similarly all will override any specified option.
 
 ## Architecture Naming
 
@@ -92,8 +92,7 @@ zig build -Darchitectures=x86_32 -Doutputs=img,elf
 
 ```shell
 # Run in QEMU with the built image
-./make_image.sh
-qemu-system-i386 -drive file=artinitium.img,format=raw -serial file:serial.log -serial stdio -s -S -m 2G -no-reboot -no-shutdown
+qemu-system-i386 -drive file=ArtInitium.x86_32.img,format=raw -serial file:serial.log -serial stdio -s -S -m 2G -no-reboot -no-shutdown
 ```
 
 ## Dependencies
@@ -178,6 +177,33 @@ diff --git a/../../.local/share/pipx/venvs/binary-manager/lib/python3.12/site-pa
 
 There are currently no plans to support custom feature sets of Arm CPUs at the time of writing. 
 The most "default" configuration will be used to launch the QEMU instance, and this is what will be supported.
+
+### Building Arm64 image for qemu
+
+```shell
+# Make sure Zig 0.15.2 is in PATH or use the test script
+zig build -Darchitectures=arm64 -Doutputs=img
+```
+
+or if you want to debug etc use
+
+```shell
+zig build -Darchitectures=arm64 -Doutputs=img,elf
+```
+
+### Testing x86_32
+
+
+```shell
+# Run in QEMU with the built image
+qemu-system-aarch64 \
+    -M virt \
+    -cpu cortex-a57 \
+    -m 2G \
+    -kernel ArtInitium.arm64.img \
+    -dtb dtb/qemu-virt-arm64.dtb
+```
+
 
 ## ArtInitium for riscv
 
