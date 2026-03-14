@@ -6,8 +6,8 @@ const std = @import("std");
 const serial = @import("artlib").serial;
 const cpu = @import("artlib").cpu;
 
-pub fn init(arg: usize) noreturn {
-    _ = arg;
+pub fn init(dtb_addr: usize) noreturn {
+    _ = dtb_addr; // TODO: pass to DTB parser
     serial.early_init() catch {
         // If UART init fails, just carry on, and hope late init works
     };
