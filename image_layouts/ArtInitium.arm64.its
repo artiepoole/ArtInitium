@@ -3,17 +3,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Artie Poole
 //
-// Binman image description for ArtInitium bootloader disk image.
-// Assembles the final artinitium.img from the two build outputs.
+// Binman image description for ArtInitium arm64 bootloader image.
+// Produces a flat raw binary loaded by QEMU via -kernel.
+// The DTB is passed separately via -dtb and does not need to be bundled here.
 //
 // Layout:
-//   0x00000000 (entry): ArtInitium.arm64 binary
-//   0x00800000 (dtb): artinitium.dtb
-
+//   0x00000000: ArtInitium.arm64 raw binary
 //
 // Build with:
-//   dtc -I dts -O dtb -o ArmInitium.<arch>.dtb ArmInitium.<arch>.its
-//   binman build -d ArmInitium.<arch>.dtb -I . -O .
+//   dtc -I dts -O dtb -o ArtInitium.arm64.dtb ArtInitium.arm64.its
+//   binman build -d ArtInitium.arm64.dtb -I <bin_dir> -O <out_dir>
 
 /dts-v1/;
 
@@ -23,19 +22,10 @@
 
     binman {
         filename = "artinitium.arm64.img";
-        size = <0xa00000>; /* 10 MB */
-        fill-byte = [00];
 
         artinitium_arm64 {
             type = "blob-ext";
             filename = "ArtInitium.arm64";
-            offset = <0x000000>;
-        };
-
-        fdt {
-            type = "blob-ext";
-            filename = "qemu-virt-arm64.dtb";
-            offset = <0x800000>; /* Place DTB near end of image */
         };
     };
 };
