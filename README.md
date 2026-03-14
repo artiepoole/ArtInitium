@@ -190,6 +190,8 @@ The most "default" configuration will be used to launch the QEMU instance, and t
 
 ### Building Arm64 image for qemu
 
+Note that I build the DTB here, but qemu provides its own internally. If you want to skip the dtb steps, simply remove dtb from the `-Doutputs` here, and remove the `-dtb` flag in the qemu call
+
 ```shell
 # Make sure Zig 0.15.2 is in PATH or use the test shell
 zig build -Darchitectures=arm64 -Doutputs=img,dtb
@@ -210,9 +212,18 @@ qemu-system-aarch64 \
     -cpu cortex-a57 \
     -m 2G \
     -kernel zig-out/img/ArtInitium.arm64.img \
-    -dtb zig-out/dtb/qemu-virt-arm64.dtb
+    -dtb zig-out/dtb/qemu-virt-arm64.dtb \
+    -device virtio-gpu-pci \
+    -device virtio-keyboard-pci \
+    -device virtio-mouse-pci \
+    -drive id=hd0,if=none,file=disk.img,format=raw \
+    -device virtio-blk-device,drive=hd0 \
+    -serial file:serial.log
 ```
 
+The `-M virt` machine exposes a PL011 UART at `0x9000000` (visible in `dts/qemu-virt-arm64.dts`). The `-serial file:serial.log` argument maps to that UART and logs all output to `serial.log`. Replace with `-serial stdio` to read output directly in your terminal instead.
+
+`virtio-blk-device` uses the virtio-mmio transport built into the virt machine (rather than PCI), making it the natural eMMC/block storage equivalent. You will need to create `disk.img` first - e.g. `dd if=/dev/zero of=disk.img bs=1M count=64` for a 64 MB blank disk.
 
 ## ArtInitium for riscv
 
