@@ -12,17 +12,17 @@ pub const mem = @import("common/data_types/data_types.zig");
 // Architecture-specific modules
 pub const cpu = switch (builtin.cpu.arch) {
     .x86 => @import("x86_32/cpu.zig"),
+    .aarch64, .aarch64_be => @import("arm64/cpu.zig"),
     // .x86_64 => @import("x86_64/cpu.zig"),
     // .arm, .armeb => @import("arm32/cpu.zig"),
-    // .aarch64, .aarch64_be => @import("arm64/cpu.zig"),
     else => @compileError("Unsupported architecture for cpu"),
 };
 
 pub const serial = switch (builtin.cpu.arch) {
     .x86 => @import("x86_32/serial.zig"),
+    .aarch64, .aarch64_be => @import("arm64/uart.zig"),
     // .x86_64 => @import("x86_64/serial.zig"),
     // .arm, .armeb => @import("arm32/serial.zig"),
-    // .aarch64, .aarch64_be => @import("arm64/serial.zig"),
     else => @compileError("Unsupported architecture for serial"),
 };
 
