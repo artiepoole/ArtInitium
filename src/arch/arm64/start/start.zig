@@ -10,6 +10,8 @@ pub export fn _start() callconv(.naked) noreturn {
     asm volatile (
         \\.section .text.boot, "ax", %progbits
         \\.global _start
+        // Save DTB address passed by QEMU in x0 before we clobber it
+        \\  mov x19, x0
         // Determine which Exception Level we are in
         // EL2 is common when launched with default QEMU flags
         \\  mrs x0, CurrentEL
@@ -59,7 +61,8 @@ pub export fn _start() callconv(.naked) noreturn {
         \\  b .bss_zero_loop
         \\.bss_done:
 
-    // Jump to the Zig main stage function
+    // Jump to the Zig main stage function, passing DTB address as first argument
+        \\  mov x0, x19
         \\  bl ArtInitium_entry
 
     // Should never return, but park if it does
