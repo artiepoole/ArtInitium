@@ -16,13 +16,9 @@ pub export fn _start() callconv(.naked) noreturn {
         // EL2 is common when launched with default QEMU flags
         \\  mrs x0, CurrentEL
         \\  lsr x0, x0, #2
-        \\  and x0, x0, #0x3
+        \\  and x0, x0, #0b11
         \\  cmp x0, #2
-        \\  b.eq .el2_setup
-
-    // EL1 setup
-        \\.el1_setup:
-        \\  b .common_setup
+        \\  b.ne .common_setup // If not EL2, assume EL1 and jump to common setup
 
     // EL2 setup - drop to EL1
         \\.el2_setup:
@@ -47,8 +43,9 @@ pub export fn _start() callconv(.naked) noreturn {
         \\  cbnz x0, .park
 
     // Set up the stack pointer
-    // Stack grows downward from _start
-        \\  adr x0, _start
+    // Stack grows downward from __stack_top, which is defined in the linker script
+    // stack is 64 KB, so __stack_top is 64 KB after bss_end
+        \\  adr x0, __stack_top
         \\  mov sp, x0
 
     // Zero out the BSS section
