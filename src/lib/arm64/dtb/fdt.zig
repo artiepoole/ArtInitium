@@ -31,9 +31,9 @@ pub const PropHeader = extern struct {
 };
 
 
-/// FDT header, located at the base address passed in x0 by QEMU.
-/// All fields are big-endian.
-pub const Header = extern struct {
+/// Raw FDT header layout as it exists in memory — big-endian, no padding.
+/// Safe to pointer-cast directly from the DTB blob address.
+pub const HeaderRaw = extern struct {
     magic: u32,
     totalsize: u32,
     off_dt_struct: u32,
@@ -44,27 +44,33 @@ pub const Header = extern struct {
     boot_cpuid_phys: u32,
     size_dt_strings: u32,
     size_dt_struct: u32,
+};
 
-    /// Read and byte-swap all fields from a big-endian blob.
-    pub fn from_ptr(addr: usize) *const Header {
-        return @ptrFromInt(addr);
+/// FDT header wrapper. Cast from a DTB blob address with `Header.from_ptr(addr)`.
+/// Provides validation and conversion to native-endian `HeaderNative`.
+pub const Header = struct {
+    raw: *const HeaderRaw,
+
+    /// Cast a raw memory address to a Header.
+    pub fn from_ptr(addr: usize) Header {
+        return .{ .raw = @ptrFromInt(addr) };
     }
 
-    pub fn magic_valid(self: *const Header) bool {
-        return std.mem.bigToNative(u32, self.magic) == MAGIC;
+    pub fn magic_valid(self: Header) bool {
+        return std.mem.bigToNative(u32, self.raw.magic) == MAGIC;
     }
 
-    pub fn native(self: *const Header) HeaderNative {
+    pub fn native(self: Header) HeaderNative {
         return .{
-            .totalsize         = std.mem.bigToNative(u32, self.totalsize),
-            .off_dt_struct     = std.mem.bigToNative(u32, self.off_dt_struct),
-            .off_dt_strings    = std.mem.bigToNative(u32, self.off_dt_strings),
-            .off_mem_rsvmap    = std.mem.bigToNative(u32, self.off_mem_rsvmap),
-            .version           = std.mem.bigToNative(u32, self.version),
-            .last_comp_version = std.mem.bigToNative(u32, self.last_comp_version),
-            .boot_cpuid_phys   = std.mem.bigToNative(u32, self.boot_cpuid_phys),
-            .size_dt_strings   = std.mem.bigToNative(u32, self.size_dt_strings),
-            .size_dt_struct    = std.mem.bigToNative(u32, self.size_dt_struct),
+            .totalsize         = std.mem.bigToNative(u32, self.raw.totalsize),
+            .off_dt_struct     = std.mem.bigToNative(u32, self.raw.off_dt_struct),
+            .off_dt_strings    = std.mem.bigToNative(u32, self.raw.off_dt_strings),
+            .off_mem_rsvmap    = std.mem.bigToNative(u32, self.raw.off_mem_rsvmap),
+            .version           = std.mem.bigToNative(u32, self.raw.version),
+            .last_comp_version = std.mem.bigToNative(u32, self.raw.last_comp_version),
+            .boot_cpuid_phys   = std.mem.bigToNative(u32, self.raw.boot_cpuid_phys),
+            .size_dt_strings   = std.mem.bigToNative(u32, self.raw.size_dt_strings),
+            .size_dt_struct    = std.mem.bigToNative(u32, self.raw.size_dt_struct),
         };
     }
 };
