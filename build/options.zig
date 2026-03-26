@@ -28,9 +28,10 @@ pub const OutOptions = struct {
     bin: bool,
     elf: bool,
     img: bool,
+    dtb: bool,
 
     pub fn parse(opt: []const u8) OutOptions {
-        var result = OutOptions{ .bin = false, .elf = false, .img = false };
+        var result = OutOptions{ .bin = false, .elf = false, .img = false, .dtb = false };
         var it = std.mem.splitScalar(u8, opt, ',');
         while (it.next()) |token| {
             const trimmed = std.mem.trim(u8, token, " ");
@@ -38,12 +39,15 @@ pub const OutOptions = struct {
                 result.bin = true;
                 result.elf = true;
                 result.img = true;
+                result.dtb = true;
             } else if (std.mem.eql(u8, trimmed, "bin")) {
                 result.bin = true;
             } else if (std.mem.eql(u8, trimmed, "elf")) {
                 result.elf = true;
             } else if (std.mem.eql(u8, trimmed, "img")) {
                 result.img = true;
+            } else if (std.mem.eql(u8, trimmed, "dtb")) {
+                result.dtb = true;
             } else if (std.mem.eql(u8, trimmed, "none")) {
                 // Explicitly do nothing - keep all false
             }

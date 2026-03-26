@@ -5,8 +5,8 @@ Written for academic purposes in Zig 0.15.2 and various forms of assembly.
 ## Overview
 
 ArtInitium is a multi-stage bootloader. It is designed to be simple and educational, demonstrating the boot process and basic hardware interactions without relying on complex bootloaders like GRUB.
-The main goal is to be cross_platform to demonstrate Zig's power in this domain, but currently it only supports x86_32.
-Future plans include adding support for x86_64, ARM 32, ARM 64 and RISC-V.
+The main goal is to be cross-platform to demonstrate Zig's power in this domain. Currently it supports x86_32 and arm64.
+Future plans include adding support for x86_64, ARM 32 and RISC-V.
 In x86_32 it replaces GRUB for QEMU.
 For this architecture it demonstrates the complete boot process from BIOS handoff to protected mode kernel loading.
 
@@ -15,16 +15,16 @@ For this architecture it demonstrates the complete boot process from BIOS handof
 The build system has been configured such that any combination of architectures and output file formats can be specified as comma separated lists of options. By default, "none" is selected and so you must specify at least one option for architectures and outputs. See below for the usage
 
 ```shell 
-zig build [-Darchitectures=<none|x86_32|arm64|all>] [-Doutputs=<none|elf|bin|img|all>]
+zig build [-Darchitectures=<none|x86_32|arm64|all>] [-Doutputs=<none|elf|bin|img|dtb|all>] [-Dbinman=<path>]
 ```
 
-Below is an example which will build for all architectures and "install" the images and ELF (containing debug information) files to `zig-out/<ext>/ArtInitium.<arch>.<ext>`. Note that for x86_32 and x86_64 architectures, there will be several binaries and two elfs. This is because those architectures start in a 16-bit only mode (real mode), before progressing to higher levels (such as 32-bit (protected mode) before 64-bit (long mode) for x86_64).
+Below is an example which will build for all architectures and "install" the images and ELF (containing debug information) files to `zig-out/<ext>/ArtInitium.<arch>.<ext>`. Note that for x86_32 and x86_64 architectures, there will be several binaries and two elfs. This is because those architectures start in a 16-bit only mode (real mode), before progressing to higher levels (such as 32-bit (protected mode) before 64-bit (long mode) for x86_64). For arm64, a reference DTB compiled from `dts/qemu-virt-arm64.dts` is also installed to `zig-out/dtb/` — it is not bundled in the image but passed to QEMU separately via `-dtb`.
 
 ```shell
 zig build -Darchitectures=all -Doutputs=img,elf
 ```
 
-Note that if you specify "none,<anything_else>", none will take the lowest precedence, and similarly all will override any speficied option.
+Note that if you specify "none,<anything_else>", none will take the lowest precedence, and similarly all will override any specified option.
 
 ## Architecture Naming
 
@@ -90,18 +90,23 @@ zig build -Darchitectures=x86_32 -Doutputs=img,elf
 
 ```shell
 # Run in QEMU with the built image
-./make_image.sh
-qemu-system-i386 -drive file=artinitium.img,format=raw -serial file:serial.log -serial stdio -s -S -m 2G -no-reboot -no-shutdown
+qemu-system-i386 -drive file=zig-out/img/ArtInitium.x86_32.img,format=raw -serial file:serial.log -serial stdio -s -S -m 2G -no-reboot -no-shutdown
 ```
 
 ## Dependencies
 
-### qemu and normal build tools
+### qemu and normal build tools for x86 targets
 
-I am running qemu-system-i386 for testing and normal build tools like make, gcc, etc. for building the stages. You can install them on Ubuntu with:
+I am running qemu-system-i386 for testing and normal build tools like make, gcc, etc. for building the x86_32 real-mode stages. These are only required for x86_32 targets. You can install them on Ubuntu with:
 
 ```shell
 sudo apt install qemu-system-x86 build-essential
+```
+
+For arm64 targets, only Zig itself is required — binary extraction uses `zig objcopy` (bundled with Zig, LLVM-backed, cross-architecture) so no additional cross-compilation tools are needed. Install the QEMU arm64 machine with:
+
+```shell
+sudo apt install qemu-system-arm
 ```
 
 ### device-tree-compiler (dtc)
@@ -118,6 +123,12 @@ For image building, I am using u-boot's [binman](https://docs.u-boot.org/en/late
 
 ```shell
 pipx install binary-manager
+```
+
+The build system defaults to looking for binman at `~/.local/bin/binman` (the standard pipx install location). If yours is elsewhere, override it with `-Dbinman=`:
+
+```shell
+zig build -Darchitectures=x86_32 -Doutputs=img -Dbinman=/usr/bin/binman
 ```
 
 but there was a dependency or import issue which I fixed on ubuntu with the patch below. If you have the same issue, you can apply the patch below to your pipx installation. The file to patch is likely located at `~/.local/share/pipx/venvs/binary-manager/lib/python3.12/site-packages/binman/control.py` but it may be different based on your python version and pipx configuration.
@@ -176,6 +187,43 @@ diff --git a/../../.local/share/pipx/venvs/binary-manager/lib/python3.12/site-pa
 
 There are currently no plans to support custom feature sets of Arm CPUs at the time of writing. 
 The most "default" configuration will be used to launch the QEMU instance, and this is what will be supported.
+
+### Building Arm64 image for qemu
+
+Note that I build the DTB here, but qemu provides its own internally. If you want to skip the dtb steps, simply remove dtb from the `-Doutputs` here, and remove the `-dtb` flag in the qemu call
+
+```shell
+# Make sure Zig 0.15.2 is in PATH or use the test shell
+zig build -Darchitectures=arm64 -Doutputs=img,dtb
+```
+
+or if you want to debug etc use
+
+```shell
+zig build -Darchitectures=arm64 -Doutputs=img,elf,dtb
+```
+
+### Testing arm64
+
+```shell
+# Run in QEMU with the built image
+qemu-system-aarch64 \
+    -M virt \
+    -cpu cortex-a57 \
+    -m 2G \
+    -kernel zig-out/img/ArtInitium.arm64.img \
+    -dtb zig-out/dtb/qemu-virt-arm64.dtb \
+    -device virtio-gpu-pci \
+    -device virtio-keyboard-pci \
+    -device virtio-mouse-pci \
+    -drive id=hd0,if=none,file=disk.img,format=raw \
+    -device virtio-blk-device,drive=hd0 \
+    -serial file:serial.log
+```
+
+The `-M virt` machine exposes a PL011 UART at `0x9000000` (visible in `dts/qemu-virt-arm64.dts`). The `-serial file:serial.log` argument maps to that UART and logs all output to `serial.log`. Replace with `-serial stdio` to read output directly in your terminal instead.
+
+`virtio-blk-device` uses the virtio-mmio transport built into the virt machine (rather than PCI), making it the natural eMMC/block storage equivalent. You will need to create `disk.img` first - e.g. `dd if=/dev/zero of=disk.img bs=1M count=64` for a 64 MB blank disk.
 
 ## ArtInitium for riscv
 

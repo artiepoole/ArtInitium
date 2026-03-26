@@ -26,24 +26,30 @@ pub fn build(b: *std.Build) void {
 
     const output_types = options.OutOptions.parse(output_types_option);
 
-    const arm64_target = b.resolveTargetQuery(.{
-        .cpu_arch = .aarch64,
-        .os_tag = .freestanding,
-    });
+    // Allow overriding the binman binary path, defaulting to the pipx install location.
+    // Override with e.g. -Dbinman=/usr/bin/binman
+    const binman = b.option(
+        []const u8,
+        "binman",
+        "Path to the binman executable (default: ~/.local/bin/binman)",
+    ) orelse (std.fs.path.join(b.allocator, &.{ b.graph.env_map.get("HOME") orelse "/root", ".local/bin/binman" }) catch @panic("OOM"));
 
-    // just use it to avoid "unused variable" compile error for now, since we can't build arm64 yet
-    _ = arm64_target;
+    const build_selected = b.step("build_selected", "Build all requested architectures");
 
     // Build x86_32 if requested
     if (architectures.x86_32) {
-        x86_32_build.build(b, optimise, output_types);
+        const step = x86_32_build.build(b, optimise, output_types, binman);
         x86_32_build.buildTests(b);
+        build_selected.dependOn(step);
     }
 
     // Build ARM64 if requested
     if (architectures.arm64) {
-        arm64_build.build(b, optimise, output_types);
+        const step = arm64_build.build(b, optimise, output_types, binman);
+        build_selected.dependOn(step);
     }
+
+    b.default_step = build_selected;
 
     // Setup common build steps (clean, etc.)
     common.setupCommonSteps(b);
