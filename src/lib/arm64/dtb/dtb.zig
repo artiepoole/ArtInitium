@@ -9,7 +9,6 @@
 /// Ref: Devicetree Specifications
 /// https://devicetree-specification.readthedocs.io/en/stable/flattened-format.html
 /// https://github.com/devicetree-org/devicetree-specification/releases/download/v0.4/devicetree-specification-v0.4.pdf
-
 const std = @import("std");
 pub const fdt = @import("fdt.zig");
 pub const node = @import("node.zig");
@@ -37,8 +36,19 @@ pub const Dtb = struct {
     header: fdt.HeaderNative,
 
     pub fn init(addr: usize) Error!Dtb {
-        _ = addr;
-        @panic("unimplemented");
+        const hdr_ptr = fdt.Header.from_ptr(addr);
+
+        if (!hdr_ptr.magic_valid()) {
+            return Error.InvalidMagic;
+        }
+        if (!hdr_ptr.version_valid()) {
+            return Error.InvalidVersion;
+        }
+
+        return Dtb{
+            .base = addr,
+            .header = hdr_ptr.native(),
+        };
     }
 
     /// Returns a Walker over the structure block.
@@ -55,8 +65,6 @@ pub const Dtb = struct {
 ///       while (w.next_prop()) |p| { ... }
 ///   }
 pub const Walker = struct {
-
-
     fn init(base: usize, header: fdt.HeaderNative) Walker {
         const struct_base = base + header.off_dt_struct;
         _ = struct_base;
@@ -68,6 +76,7 @@ pub const Walker = struct {
     pub fn next_node(self: *Walker) ?node.Node {
         _ = self;
         @panic("unimplemented");
+        // try_probe_node(this);
     }
 
     /// Read the next PROP token at the current cursor position.

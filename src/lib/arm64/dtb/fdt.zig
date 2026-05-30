@@ -59,7 +59,13 @@ pub const Header = extern struct {
     }
 
     pub fn magic_valid(self: *const Header) bool {
-        return std.mem.bigToNative(u32, self.magic) == MAGIC;
+        const m = std.mem.bigToNative(u32, self.magic);
+        return m == MAGIC;
+    }
+
+    pub fn version_valid(self: *const Header) bool {
+        const v = std.mem.bigToNative(u32, self.version);
+        return v == 17; // 0x11
     }
 
     pub fn native(self: *const Header) HeaderNative {
