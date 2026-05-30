@@ -179,6 +179,7 @@ diff --git a/../../.local/share/pipx/venvs/binary-manager/lib/python3.12/site-pa
      glob_list = [fname for fname in glob_list if fname.endswith('.py')]
      return set([os.path.splitext(os.path.basename(item))[0]
                  for item in glob_list
+
 ```
 
 </details>
@@ -206,7 +207,7 @@ zig build -Darchitectures=arm64 -Doutputs=img,elf,dtb
 ### Testing arm64
 
 ```shell
-# Run in QEMU with the built image
+# Run in QEMU with the built image (last 2 args optional for gdb hookup)
 qemu-system-aarch64 \
     -M virt \
     -cpu cortex-a57 \
@@ -218,8 +219,11 @@ qemu-system-aarch64 \
     -device virtio-mouse-pci \
     -drive id=hd0,if=none,file=disk.img,format=raw \
     -device virtio-blk-device,drive=hd0 \
-    -serial file:serial.log
+    -serial file:serial.log \
+    -gdb tcp:0.0.0.0:1234 \
+    -S 
 ```
+where `-gdb tcp:0.0.0.0:1234` enables remote gdb debugging (equivalent to -s, but where specifying `0.0.0.0` allows for remote control if qemu is run inside a container, for example) and `-S` starts qemu paused, only continuing on manual resume, or when gdb connects.
 
 The `-M virt` machine exposes a PL011 UART at `0x9000000` (visible in `dts/qemu-virt-arm64.dts`). The `-serial file:serial.log` argument maps to that UART and logs all output to `serial.log`. Replace with `-serial stdio` to read output directly in your terminal instead.
 
