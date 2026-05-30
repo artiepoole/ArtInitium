@@ -16,12 +16,9 @@ pub const props = @import("properties.zig");
 
 const Token = fdt.Token;
 const PropHeader = fdt.PropHeader;
+const Node = node.Node;
+const NodeToken = node.NodeToken;
 const Property = node.Property;
-
-comptime {
-    _ = std;
-    _ = PropHeader;
-}
 
 pub const Error = error{
     InvalidMagic,
@@ -29,6 +26,7 @@ pub const Error = error{
     UnexpectedToken,
     Truncated,
 };
+
 
 /// Validated DTB blob. Create with `Dtb.init(addr)`.
 pub const Dtb = struct {
@@ -52,9 +50,8 @@ pub const Dtb = struct {
     }
 
     /// Returns a Walker over the structure block.
-    pub fn walk(self: Dtb) Walker {
-        _ = self;
-        @panic("unimplemented");
+    pub fn walker(self: Dtb) Walker {
+        return Walker.init(self.base, self.header.off_dt_struct, self.header.off_dt_strings);
     }
 };
 
@@ -65,18 +62,30 @@ pub const Dtb = struct {
 ///       while (w.next_prop()) |p| { ... }
 ///   }
 pub const Walker = struct {
-    fn init(base: usize, header: fdt.HeaderNative) Walker {
-        const struct_base = base + header.off_dt_struct;
-        _ = struct_base;
-        @panic("unimplemented");
+    working_addr: usize,
+    struct_base: usize,
+    string_base: usize,
+
+    fn init(base: usize, struct_offs: usize, string_offs: usize) Walker {
+        const struct_base = base + struct_offs;
+        const string_base = base + string_offs;
+        return Walker{
+            .struct_base = struct_base,
+            .working_addr = struct_base,
+            .string_base = string_base,
+        };
     }
 
     /// Advance to the next BEGIN_NODE token.
     /// Returns the node name and depth, or null at end of tree.
-    pub fn next_node(self: *Walker) ?node.Node {
-        _ = self;
-        @panic("unimplemented");
-        // try_probe_node(this);
+    //
+    // pub fn next_node(self: *Walker) Error|node.NodeToken {
+    //     const t = NodeToken.init(self.working_addr) catch {};
+    //     return t;
+    // }
+
+    pub fn first_node(self: *Walker) node.Token {
+        return NodeToken.init(self.working_addr) catch node.Token.end_node;
     }
 
     /// Read the next PROP token at the current cursor position.

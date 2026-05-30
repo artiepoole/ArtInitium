@@ -5,7 +5,8 @@
 const std = @import("std");
 const serial = @import("artlib").serial;
 const cpu = @import("artlib").cpu;
-const dtb = @import("artlib").dtb;
+
+const init_dtb = @import("init_dtb.zig");
 
 fn enableFpSimd() void {
     asm volatile (
@@ -19,21 +20,12 @@ fn enableFpSimd() void {
 pub fn init(dtb_addr: usize) noreturn {
     // zig's return for structs or optionals uses memcpyfast which requires simd hence
     enableFpSimd();
+    // enable uart blindly
     serial.early_init() catch {};
 
-    const d = dtb.Dtb.init(dtb_addr) catch |err| {
-        // print diagnostic and halt (noreturn)
-        serial.early_write("DTB init failed: ") catch {};
-        switch (err) {
-            dtb.Error.InvalidMagic => serial.early_write("Invalid DTB magic") catch {},
-            dtb.Error.InvalidVersion => serial.early_write("Unsupported DTB version") catch {},
-            dtb.Error.UnexpectedToken => serial.early_write("Unexpected token") catch {},
-            dtb.Error.Truncated => serial.early_write("Truncated DTB") catch {},
-        }
-        serial.early_write("\n") catch {};
-        cpu.halt(); // noreturn
-    };
-    _ = d;
+    // parse the dtb and create devices off of it?
+    init_dtb.initialise_device_tree(dtb_addr) catch {};
 
+    // end execution
     cpu.halt();
 }

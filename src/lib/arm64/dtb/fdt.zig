@@ -10,14 +10,7 @@ const std = @import("std");
 
 pub const MAGIC: u32 = 0xd00dfeed;
 
-/// FDT structure block token types.
-pub const Token = enum(u32) {
-    begin_node = 0x00000001, // Start of a node; followed by null-terminated name
-    end_node = 0x00000002, // End of a node
-    prop = 0x00000003, // Property; followed by PropHeader then data
-    nop = 0x00000004, // No-op, skip
-    end = 0x00000009, // End of structure block
-};
+
 
 /// Header preceding each FDT_PROP token's data in the structure block.
 /// All fields are big-endian.
