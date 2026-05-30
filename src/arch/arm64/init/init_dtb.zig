@@ -44,7 +44,7 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
         return err;
     };
     var w = d.walker();
-    const n = w.first_node();
+    const n = w.next_node();
     _ = n;
     // while (w.next_node()) |n| {
     //     while (w.next_prop()) |p| {

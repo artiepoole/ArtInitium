@@ -78,15 +78,15 @@ pub const Walker = struct {
 
     /// Advance to the next BEGIN_NODE token.
     /// Returns the node name and depth, or null at end of tree.
-    //
-    // pub fn next_node(self: *Walker) Error|node.NodeToken {
-    //     const t = NodeToken.init(self.working_addr) catch {};
-    //     return t;
-    // }
-
-    pub fn first_node(self: *Walker) node.Token {
-        return NodeToken.init(self.working_addr) catch node.Token.end_node;
+    pub fn next_node(self: *Walker) Error!node.NodeToken {
+        const t = NodeToken.init(self.working_addr);
+        // todo: use this token to create a node like
+        // A single decoded DTB node, as yielded by the Walker.
+        // pub const Node = struct { init(addr, node_token) -> maps node tokens to real node types, and then converts them into Node type for convenience and printing)
+        //
+        return t;
     }
+
 
     /// Read the next PROP token at the current cursor position.
     /// Must be called immediately after next_node() or a previous next_prop().
