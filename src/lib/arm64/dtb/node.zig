@@ -6,11 +6,10 @@
 /// Decoded property value from a DTB node.
 /// Properties are untyped byte arrays in the FDT — the meaning depends on
 /// the property name and the node's compatible string.
-
 const std = @import("std");
 
 pub const Error = error{
-InvalidToken,
+    InvalidToken,
 };
 
 /// FDT structure block token types.
@@ -56,12 +55,12 @@ pub const Property = struct {
 pub const NodeToken = struct {
     token: u32,
 
-    pub fn init(addr: usize) Error!Token {
+    pub fn init(addr: [*]const u8) Error!Token {
         // Form a pointer to the 32-bit big-endian word at `addr`.
-        const p: *u32 = @ptrFromInt(addr);
+        const p: [*]const u32 = @alignCast(@ptrCast(addr));
 
         // Read the big-endian value and convert to native endian.
-        const be_val: u32 = p.*;
+        const be_val: u32 = p[0];
         const v: u32 = std.mem.bigToNative(u32, be_val);
 
         // Match numeric token values to the Token enum.
@@ -75,7 +74,6 @@ pub const NodeToken = struct {
             else => return Error.InvalidToken,
         }
     }
-
 };
 
 /// A single decoded DTB node, as yielded by the Walker.
@@ -83,10 +81,14 @@ pub const Node = struct {
     /// Node name (may include unit address, e.g. "pl011@9000000")
     name: []const u8,
     /// Nesting depth, 0 = root
-    depth: u32,
+    depth: usize,
     /// Raw byte slice of the property data region for this node.
     /// Iterate with Walker to extract individual properties.
-    _prop_start: usize,
+    _prop_start: [*] const u8,
+    /// number of bytes between the start of this node and the start of the next
+    len: usize;
 };
 
-comptime { _ = std; }
+comptime {
+    _ = std;
+}

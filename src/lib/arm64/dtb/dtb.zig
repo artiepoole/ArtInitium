@@ -14,7 +14,7 @@ pub const fdt = @import("fdt.zig");
 pub const node = @import("node.zig");
 pub const props = @import("properties.zig");
 
-const Token = fdt.Token;
+const Token = node.Token;
 const PropHeader = fdt.PropHeader;
 const Node = node.Node;
 const NodeToken = node.NodeToken;
@@ -25,8 +25,9 @@ pub const Error = error{
     InvalidVersion,
     UnexpectedToken,
     Truncated,
+    InvalidPropertyName,
+    InvalidNodeToken,
 };
-
 
 /// Validated DTB blob. Create with `Dtb.init(addr)`.
 pub const Dtb = struct {
@@ -62,31 +63,81 @@ pub const Dtb = struct {
 ///       while (w.next_prop()) |p| { ... }
 ///   }
 pub const Walker = struct {
-    working_addr: usize,
+    working_addr: [*]const u8,
     struct_base: usize,
     string_base: usize,
+    working_depth: usize,
 
     fn init(base: usize, struct_offs: usize, string_offs: usize) Walker {
         const struct_base = base + struct_offs;
         const string_base = base + string_offs;
         return Walker{
             .struct_base = struct_base,
-            .working_addr = struct_base,
+            .working_addr = @ptrFromInt(struct_base),
             .string_base = string_base,
+            .working_depth = 0,
         };
     }
 
     /// Advance to the next BEGIN_NODE token.
     /// Returns the node name and depth, or null at end of tree.
-    pub fn next_node(self: *Walker) Error!node.NodeToken {
-        const t = NodeToken.init(self.working_addr);
+    pub fn next_node(self: *Walker) Error!node.Node {
+        const t: Token = NodeToken.init(self.working_addr) catch |err| {
+            switch (err) {
+                error.InvalidToken => {
+                    return Error.InvalidNodeToken;
+                },
+            }
+        };
+
+        switch (t) {
+            .begin_node => {
+                // TODO factor out shared logic between node types
+                var cur: [*]const u8 = @ptrCast(self.working_addr);
+                cur += @sizeOf(u32);
+                const name_loc = cur;
+
+                var name_len: usize = 0;
+                while (name_len < 32 and cur[name_len] != 0) : (name_len += 1) {}
+
+                // If we hit the limit and still no NUL, name is invalid.
+                if (name_len == 32 and cur[name_len] != 0) {
+                    return Error.InvalidPropertyName;
+                }
+
+                const name: []const u8 = name_loc[0..name_len];
+                cur += name_len + 1; // skip bytes of name + terminating NUL
+
+                const addr = @intFromPtr(cur);
+                const aligned_addr = std.mem.alignForward(usize, addr, @sizeOf(u32));
+                cur = @ptrFromInt(aligned_addr);
+                self.working_addr = @ptrCast(@constCast(cur));
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name };
+            },
+
+            .prop => {
+                // todo advance working addr
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+            },
+            .nop => {
+                // todo advance working addr
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+            },
+            .end_node => {
+                // todo advance working addr
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+            },
+            .end => {
+                // todo advance working addr
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+            },
+        };
         // todo: use this token to create a node like
         // A single decoded DTB node, as yielded by the Walker.
         // pub const Node = struct { init(addr, node_token) -> maps node tokens to real node types, and then converts them into Node type for convenience and printing)
         //
-        return t;
+        return Error.UnexpectedToken;
     }
-
 
     /// Read the next PROP token at the current cursor position.
     /// Must be called immediately after next_node() or a previous next_prop().

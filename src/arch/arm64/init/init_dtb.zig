@@ -7,6 +7,20 @@ const serial = @import("artlib").serial;
 const dtb = @import("artlib").dtb;
 
 // Helper: print "node: {node_name}, property: {prop_name}\n"
+fn print_node(n: dtb.node.Node) void {
+    // print node label
+    serial.early_write("node: ") catch {};
+
+    // print node name (may be empty)
+    if (n.name.len == 0) {
+        serial.early_write("<unnamed>") catch {};
+    } else {
+        serial.early_write(n.name) catch {};
+    }
+
+}
+
+// Helper: print "node: {node_name}, property: {prop_name}\n"
 fn print_node_prop(node_name: []const u8, prop_name: []const u8) void {
     // print node label
     serial.early_write("node: ") catch {};
@@ -39,16 +53,18 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
             dtb.Error.InvalidVersion => serial.early_write("Unsupported DTB version") catch {},
             dtb.Error.UnexpectedToken => serial.early_write("Unexpected token") catch {},
             dtb.Error.Truncated => serial.early_write("Truncated DTB") catch {},
+            dtb.Error.InvalidPropertyName => {
+                serial.early_write("Property Name appears to exceed max length of 512. Probable address mistake") catch {};
+            },
+            dtb.Error.InvalidNodeToken => {
+                serial.early_write("Invalid Token") catch {};
+            },
         }
         serial.early_write("\n") catch {};
         return err;
     };
     var w = d.walker();
-    const n = w.next_node();
-    _ = n;
-    // while (w.next_node()) |n| {
-    //     while (w.next_prop()) |p| {
-    //         print_node_prop(n.name, p.name);
-    //     }
-    // }
+    while (w.next_node() catch null) |n| {
+        print_node(n);
+    }
 }
