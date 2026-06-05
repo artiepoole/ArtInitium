@@ -86,7 +86,7 @@ pub const Node = struct {
     /// Iterate with Walker to extract individual properties.
     _prop_start: [*] const u8,
     /// number of bytes between the start of this node and the start of the next
-    len: usize;
+    len: usize,
 };
 
 comptime {

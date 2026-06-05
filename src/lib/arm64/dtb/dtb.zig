@@ -112,26 +112,26 @@ pub const Walker = struct {
                 const aligned_addr = std.mem.alignForward(usize, addr, @sizeOf(u32));
                 cur = @ptrFromInt(aligned_addr);
                 self.working_addr = @ptrCast(@constCast(cur));
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name };
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name, .len = name_len };
             },
 
             .prop => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
             .nop => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
             .end_node => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
             .end => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "" };
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
-        };
+        }
         // todo: use this token to create a node like
         // A single decoded DTB node, as yielded by the Walker.
         // pub const Node = struct { init(addr, node_token) -> maps node tokens to real node types, and then converts them into Node type for convenience and printing)

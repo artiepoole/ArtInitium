@@ -17,6 +17,7 @@ fn print_node(n: dtb.node.Node) void {
     } else {
         serial.early_write(n.name) catch {};
     }
+    serial.early_write("\n") catch {};
 
 }
 
