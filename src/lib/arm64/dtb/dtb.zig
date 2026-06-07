@@ -56,6 +56,30 @@ pub const Dtb = struct {
     }
 };
 
+pub const Item = union(enum) {
+    begin: struct {
+        start: usize,
+        token: Token,
+        name: []const u8,
+        name_len: usize,
+        resulting_depth: usize,
+    },
+    property: struct {
+        name: []const u8,
+        name_len: usize,
+        data: []const u8,
+        data_len: usize,
+    },
+    nop: struct {
+        start: usize,
+    },
+    end_node: struct {
+        start: usize,
+        resulting_depth: usize,
+    },
+    end,
+};
+
 /// Iterates the FDT structure block token-by-token.
 /// Usage:
 ///   var w = dtb.walk();
@@ -81,7 +105,7 @@ pub const Walker = struct {
 
     /// Advance to the next BEGIN_NODE token.
     /// Returns the node name and depth, or null at end of tree.
-    pub fn next_node(self: *Walker) Error!?node.Node {
+    pub fn next(self: *Walker) Error!Item {
         const t: Token = NodeToken.init(self.working_addr) catch |err| {
             switch (err) {
                 error.InvalidToken => {
@@ -93,6 +117,8 @@ pub const Walker = struct {
         switch (t) {
             .begin_node => {
                 // TODO factor out shared logic between node types
+                self.working_depth += 1;
+                const start = @intFromPtr(self.working_addr);
                 var cur: [*]const u8 = @ptrCast(self.working_addr);
                 cur += @sizeOf(u32);
                 const name_loc = cur;
@@ -104,96 +130,70 @@ pub const Walker = struct {
                 if (name_len == 32 and cur[name_len] != 0) {
                     return Error.InvalidPropertyName;
                 }
-
-                const name: []const u8 = name_loc[0..name_len];
                 cur += name_len + 1; // skip bytes of name + terminating NUL
-
+                const name = name_loc[0..name_len];
                 const addr = @intFromPtr(cur);
                 const aligned_addr = std.mem.alignForward(usize, addr, @sizeOf(u32));
                 cur = @ptrFromInt(aligned_addr);
-                self.working_addr = @ptrCast(@constCast(cur));
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name, .len = name_len };
+                self.working_addr = cur;
+                return Item{ .begin = .{
+                    .start = start,
+                    .token = t,
+                    .resulting_depth = self.working_depth,
+                    .name = name,
+                    .name_len = name_len,
+                } };
             },
 
             .prop => {
-                // todo advance working addr
-                self.working_depth += 1;
                 var cur: [*]const u8 = @ptrCast(self.working_addr);
                 cur += @sizeOf(u32);
                 const len: u32 = std.mem.readInt(u32, cur[0..4], .big);
                 cur += @sizeOf(u32);
                 const nameoff: u32 = std.mem.readInt(u32, cur[0..4], .big);
-                const name_start: [*] const u8 = @ptrCast(&self.string_base[nameoff]);
+                const name_start: [*]const u8 = @ptrCast(&self.string_base[@as(usize, nameoff)]);
                 var name_len: usize = 0;
                 while ((name_start[name_len] != 0 and name_len < 32)) {
                     name_len += 1;
                 }
-
+                const name = name_start[0..name_len];
 
                 cur += @sizeOf(u32);
-                const prop_data: [*] const u32 = @alignCast(@ptrCast(cur));
-                _ = prop_data;
-                cur += len;
+                const data_len: usize = @as(usize, len);
+                const data: []const u8 = cur[0..data_len];
+                cur += data_len;
                 const addr = @intFromPtr(cur);
                 const aligned_addr = std.mem.alignForward(usize, addr, @sizeOf(u32));
                 cur = @ptrFromInt(aligned_addr);
-                self.working_addr = @ptrCast(@constCast(cur));
+                self.working_addr = cur;
 
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name_start[0..name_len], .len = len };
+                return Item{ .property = .{
+                    .name = name,
+                    .name_len = name_len,
+                    .data = data,
+                    .data_len = data_len,
+                } };
             },
             .nop => {
+                const start = @intFromPtr(self.working_addr);
                 self.working_addr += @sizeOf(u32);
-                self.working_depth -|= 1;
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
+                return Item{ .nop = .{
+                    .start = start,
+                } };
             },
             .end_node => {
+                const start = @intFromPtr(self.working_addr);
                 self.working_addr += @sizeOf(u32);
                 self.working_depth -|= 1;
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
+                return Item{ .end_node = .{
+                    .start = start,
+                    .resulting_depth = self.working_depth,
+                } };
             },
             .end => {
-                // todo advance working addr
-                return null;
+                return Item.end;
             },
         }
-        // todo: use this token to create a node like
-        // A single decoded DTB node, as yielded by the Walker.
-        // pub const Node = struct { init(addr, node_token) -> maps node tokens to real node types, and then converts them into Node type for convenience and printing)
-        //
         return Error.UnexpectedToken;
-    }
-
-    /// Read the next PROP token at the current cursor position.
-    /// Must be called immediately after next_node() or a previous next_prop().
-    /// Returns null when the current node's properties are exhausted.
-    pub fn next_prop(self: *Walker) ?Property {
-        _ = self;
-        @panic("unimplemented");
-    }
-
-    // ---- private helpers ----
-
-    fn read_token(self: *Walker) ?Token {
-        _ = self;
-        @panic("unimplemented");
-    }
-
-    fn read_name(self: *Walker) []const u8 {
-        _ = self;
-        @panic("unimplemented");
-    }
-
-    fn read_prop(self: *Walker) Property {
-        _ = self;
-        @panic("unimplemented");
-    }
-
-    fn skip_prop(self: *Walker) void {
-        _ = self;
-    }
-
-    fn read_string(addr: usize) []const u8 {
-        _ = addr;
-        @panic("unimplemented");
     }
 };

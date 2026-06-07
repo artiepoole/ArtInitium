@@ -6,10 +6,12 @@ const std = @import("std");
 const serial = @import("artlib").serial;
 const dtb = @import("artlib").dtb;
 
-// Helper: print "node: {node_name}, property: {prop_name}\n"
-fn print_node(n: dtb.node.Node) void {
+const BeginItem = std.meta.TagPayload(dtb.Item, .begin);
+const PropertyItem = std.meta.TagPayload(dtb.Item, .property);
+
+fn print_node(n: BeginItem) void {
     // print node label
-    serial.early_write("node: ") catch {};
+    serial.early_write("Begin node: ") catch {};
 
     // print node name (may be empty)
     if (n.name.len == 0) {
@@ -18,30 +20,19 @@ fn print_node(n: dtb.node.Node) void {
         serial.early_write(n.name) catch {};
     }
     serial.early_write("\n") catch {};
-
 }
 
 // Helper: print "node: {node_name}, property: {prop_name}\n"
-fn print_node_prop(node_name: []const u8, prop_name: []const u8) void {
+fn print_prop(p: PropertyItem) void {
     // print node label
-    serial.early_write("node: ") catch {};
+    serial.early_write("Property: ") catch {};
 
     // print node name (may be empty)
-    if (node_name.len == 0) {
-        serial.early_write("<unnamed>") catch {};
+    if (p.name.len == 0) {
+        serial.early_write("") catch {};
     } else {
-        serial.early_write(node_name) catch {};
+        serial.early_write(p.name) catch {};
     }
-
-    // print separator and property name
-    serial.early_write(", property: ") catch {};
-    if (prop_name.len == 0) {
-        serial.early_write("<unnamed>") catch {};
-    } else {
-        serial.early_write(prop_name) catch {};
-    }
-
-    // newline
     serial.early_write("\n") catch {};
 }
 
@@ -65,11 +56,19 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
         return err;
     };
     var w = d.walker();
-    while (w.next_node() catch null) |n| {
-        print_node(n);
+    while (w.next() catch null) |item| {
+        switch (item) {
+            .begin => |n| {
+                print_node(n);
+            },
+            .property => |p| {
+                print_prop(p);
+            },
+            .nop => {},
+            .end_node => {},
+            .end => {
+                break;
+            },
+        }
     }
-    else {
-        serial.early_write("All nodes parsed\n") catch {};
-    }
-
 }
