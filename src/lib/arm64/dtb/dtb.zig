@@ -27,6 +27,7 @@ pub const Error = error{
     Truncated,
     InvalidPropertyName,
     InvalidNodeToken,
+    BadHex,
 };
 
 /// Validated DTB blob. Create with `Dtb.init(addr)`.
@@ -101,6 +102,11 @@ pub const Walker = struct {
             .string_base = @ptrFromInt(string_base),
             .working_depth = 0,
         };
+    }
+
+    fn restart(self: *Walker) void {
+        self.working_addr = self.struct_base;
+        self.working_depth = 0;
     }
 
     /// Advance to the next BEGIN_NODE token.

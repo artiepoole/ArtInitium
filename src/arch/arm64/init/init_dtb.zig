@@ -36,6 +36,22 @@ fn print_prop(p: PropertyItem) void {
     serial.early_write("\n") catch {};
 }
 
+const device_ids = enum {
+    pl011,
+    pl031,
+    pcie,
+    memory,
+    other,
+};
+
+fn device_type(id: []const u8) device_ids {
+    if (std.mem.eql(u8, id, "pl011")) return .pl011;
+    if (std.mem.eql(u8, id, "pl031")) return .pl031;
+    if (std.mem.eql(u8, id, "pcie")) return .pcie;
+    if (std.mem.eql(u8, id, "memory")) return .memory;
+    return .other;
+}
+
 pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
     const d = dtb.Dtb.init(dtb_addr) catch |err| {
         // print diagnostic and halt (noreturn)
@@ -51,6 +67,9 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
             dtb.Error.InvalidNodeToken => {
                 serial.early_write("Invalid Token") catch {};
             },
+            dtb.Error.BadHex => {
+                serial.early_write("bad hex in address") catch {};
+            },
         }
         serial.early_write("\n") catch {};
         return err;
@@ -60,6 +79,40 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
         switch (item) {
             .begin => |n| {
                 print_node(n);
+                const at = std.mem.indexOfScalar(u8, n.name, '@');
+                const id = if (at) |i| n.name[0..i] else n.name;
+                const addr = if (at) |i| n.name[i + 1 ..] else "";
+                switch (device_type(id)) {
+                    .pl011 => {
+                        const addr_usize = std.fmt.parseInt(usize, addr, 16) catch {
+                            return dtb.Error.BadHex;
+                        };
+                        const prime = serial.PrimeCell.init(addr_usize);
+                        _ = prime;
+                        while (w.next() catch null) |sub_item| {
+                            switch (sub_item) {
+                                .begin => {
+                                    return error.InvalidNodeToken;
+                                },
+                                .property => |p| {
+                                    print_prop(p);
+                                },
+                                .nop => {},
+                                .end_node => {
+                                    serial.early_write("End Node\n") catch {};
+                                    break;
+                                },
+                                .end => {
+                                    return error.InvalidNodeToken;
+                                },
+                            }
+                        }
+                    },
+                    .pl031 => {},
+                    .pcie => {},
+                    .memory => {},
+                    .other => {},
+                }
             },
             .property => |p| {
                 print_prop(p);
@@ -67,6 +120,7 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
             .nop => {},
             .end_node => {},
             .end => {
+                serial.early_write("End tree\n") catch {};
                 break;
             },
         }
