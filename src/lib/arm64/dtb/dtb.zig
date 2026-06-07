@@ -64,24 +64,24 @@ pub const Dtb = struct {
 ///   }
 pub const Walker = struct {
     working_addr: [*]const u8,
-    struct_base: usize,
-    string_base: usize,
+    struct_base: [*]const u8,
+    string_base: [*]const u8,
     working_depth: usize,
 
     fn init(base: usize, struct_offs: usize, string_offs: usize) Walker {
         const struct_base = base + struct_offs;
         const string_base = base + string_offs;
         return Walker{
-            .struct_base = struct_base,
+            .struct_base = @ptrFromInt(struct_base),
             .working_addr = @ptrFromInt(struct_base),
-            .string_base = string_base,
+            .string_base = @ptrFromInt(string_base),
             .working_depth = 0,
         };
     }
 
     /// Advance to the next BEGIN_NODE token.
     /// Returns the node name and depth, or null at end of tree.
-    pub fn next_node(self: *Walker) Error!node.Node {
+    pub fn next_node(self: *Walker) Error!?node.Node {
         const t: Token = NodeToken.init(self.working_addr) catch |err| {
             switch (err) {
                 error.InvalidToken => {
@@ -117,19 +117,43 @@ pub const Walker = struct {
 
             .prop => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
+                self.working_depth += 1;
+                var cur: [*]const u8 = @ptrCast(self.working_addr);
+                cur += @sizeOf(u32);
+                const len: u32 = std.mem.readInt(u32, cur[0..4], .big);
+                cur += @sizeOf(u32);
+                const nameoff: u32 = std.mem.readInt(u32, cur[0..4], .big);
+                const name_start: [*] const u8 = @ptrCast(&self.string_base[nameoff]);
+                var name_len: usize = 0;
+                while ((name_start[name_len] != 0 and name_len < 32)) {
+                    name_len += 1;
+                }
+
+
+                cur += @sizeOf(u32);
+                const prop_data: [*] const u32 = @alignCast(@ptrCast(cur));
+                _ = prop_data;
+                cur += len;
+                const addr = @intFromPtr(cur);
+                const aligned_addr = std.mem.alignForward(usize, addr, @sizeOf(u32));
+                cur = @ptrFromInt(aligned_addr);
+                self.working_addr = @ptrCast(@constCast(cur));
+
+                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = name_start[0..name_len], .len = len };
             },
             .nop => {
-                // todo advance working addr
+                self.working_addr += @sizeOf(u32);
+                self.working_depth -|= 1;
                 return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
             .end_node => {
-                // todo advance working addr
+                self.working_addr += @sizeOf(u32);
+                self.working_depth -|= 1;
                 return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
             },
             .end => {
                 // todo advance working addr
-                return Node{ ._prop_start = self.working_addr, .depth = self.working_depth, .name = "", .len = 0 };
+                return null;
             },
         }
         // todo: use this token to create a node like

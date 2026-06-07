@@ -68,4 +68,8 @@ pub fn initialise_device_tree(dtb_addr: usize) dtb.Error!void {
     while (w.next_node() catch null) |n| {
         print_node(n);
     }
+    else {
+        serial.early_write("All nodes parsed\n") catch {};
+    }
+
 }
