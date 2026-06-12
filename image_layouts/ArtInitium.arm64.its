@@ -1,0 +1,31 @@
+// ArtInitium - MultiArch Bootloader for QEMU
+//
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Artie Poole
+//
+// Binman image description for ArtInitium arm64 bootloader image.
+// Produces a flat raw binary loaded by QEMU via -kernel.
+// The DTB is passed separately via -dtb and does not need to be bundled here.
+//
+// Layout:
+//   0x00000000: ArtInitium.arm64 raw binary
+//
+// Build with:
+//   dtc -I dts -O dtb -o ArtInitium.arm64.dtb ArtInitium.arm64.its
+//   binman build -d ArtInitium.arm64.dtb -I <bin_dir> -O <out_dir>
+
+/dts-v1/;
+
+/ {
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    binman {
+        filename = "artinitium.arm64.img";
+
+        artinitium_arm64 {
+            type = "blob-ext";
+            filename = "ArtInitium.arm64";
+        };
+    };
+};
