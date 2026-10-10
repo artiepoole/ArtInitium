@@ -49,7 +49,12 @@ pub fn build(b: *std.Build, optimise: std.builtin.OptimizeMode, output_types: op
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .aarch64,
         .os_tag = .freestanding,
-        .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
+        .cpu_model = .{
+            .explicit = &std.Target.aarch64.cpu.cortex_a57,
+        },
+        .cpu_features_add = std.Target.aarch64.featureSet(&.{
+            .strict_align,
+        }),
     });
 
     // ---------------------------------------------------------------

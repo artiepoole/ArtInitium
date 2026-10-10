@@ -5,6 +5,7 @@
 const std = @import("std");
 const serial = @import("artlib").serial;
 const cpu = @import("artlib").cpu;
+const mem = @import("artlib").mem;
 
 const init_dtb = @import("init_dtb.zig");
 
@@ -23,6 +24,9 @@ pub fn init(dtb_addr: usize) noreturn {
     // enable uart blindly
     serial.early_init() catch {};
 
+    // use memory allocator
+    const alloc = mem.allocator();
+    _ = alloc;
     // parse the dtb and create devices off of it?
     init_dtb.initialise_device_tree(dtb_addr) catch {};
 

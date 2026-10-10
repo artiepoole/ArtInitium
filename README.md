@@ -73,6 +73,34 @@ The x86_32 architecture implementation is as minimal as possible, with no intent
 - Loads and launches the kernel
 - Currently: demonstrates video mode switching using boot info from Stage 1b
 
+Stage 2 has a reserved heap from 0x100000 / 1MiB down to stage2_end.
+
+##### x86_32 Stage2 Memory layout
+
+```text
+Higher addresses
++---------------------------+ 0x9FC00
+|                           |
+|           Heap            |
+|                           |
++---------------------------+ ALIGN(__stage2_end, 64)
+|            BSS            |
++---------------------------+ __stage2_file_end
+|                           |
+|       Code / Data         |
+|                           |
++---------------------------+ 0x10010
+|       Stage 2 Header      |
++---------------------------+ 0x10000
+|                           |
+|      Free / Reserved      |
+|                           |
++---------------------------+ 0x9FFF  <- Initial SP
+|           Stack           |  Grows downward
++---------------------------+
+Lower addresses
+```
+
 ### Building x86_32 image for qemu
 
 ```shell
@@ -188,6 +216,35 @@ diff --git a/../../.local/share/pipx/venvs/binary-manager/lib/python3.12/site-pa
 
 There are currently no plans to support custom feature sets of Arm CPUs at the time of writing. 
 The most "default" configuration will be used to launch the QEMU instance, and this is what will be supported.
+
+The qemu firmware loads the bootloader into 0x40080000, where memory starts at 0x40000000 in qemu_arm64.
+
+
+## AArch64 — QEMU `virt`
+
+```text
+Higher addresses
++---------------------------+ __stack_top
+|           Stack           |  64 KiB
+|       Grows downward      |
++---------------------------+ __stack_top - 0x10000
+|                           |
+|      Free RAM / Heap      |
+|                           |
++---------------------------+ __bss_end
+|            BSS            |
++---------------------------+
+|           Data            |
++---------------------------+
+|         Read-only         |
+|           Data            |
++---------------------------+
+|           Text            |
++---------------------------+ 0x40080000
+|         RESERVED          |
++---------------------------+ 0x40000000
+Lower addresses
+```
 
 ### Building Arm64 image for qemu
 
