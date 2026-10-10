@@ -22,7 +22,11 @@ pub fn allocator() std.mem.Allocator {
             @ptrFromInt(heap_start),
         )[0..heap_size];
 
-        fba = .init(heap_buffer);
+        //fba = .init(heap_buffer);
+        fba = .{
+            .buffer = heap_buffer,
+            .end_index = 0,
+        };
         initialized = true;
     }
 
