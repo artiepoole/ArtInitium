@@ -35,7 +35,14 @@ SECTIONS {
     __stage2_file_end = .;  /* End of actual file data */
 
     .bss : { *(.bss*) *(COMMON) } > USABLE_LOW
-    __stage2_end = .;       /* End including .bss (for memory layout) */
+    __stage2_end = .;  /* End including .bss */
+
+    __heap_start = ALIGN(__stage2_end, 64);
+    __heap_end   = 0x100000;
+    __heap_size  = __heap_end - __heap_start;
+
+    ASSERT(__heap_start < __heap_end, "No space available for heap")
+
 
     /* Assert Stage2 does not exceed 0x100000, i.e. doesn't bleed into kernel address space */
 /*    ASSERT(__stage2_end < 0x100000, "Stage2 exceeds 1MB boundary")*/

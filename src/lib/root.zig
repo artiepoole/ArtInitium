@@ -29,7 +29,7 @@ pub const io = switch (builtin.cpu.arch) {
 
 pub const log = @import("common/log.zig");
 
-pub const mem = @import("common/data_types/data_types.zig");
+pub const data_types = @import("common/data_types/data_types.zig");
 
 pub const serial = switch (builtin.cpu.arch) {
     .x86 => @import("x86_32/serial.zig"),
@@ -46,6 +46,8 @@ pub const video = switch (builtin.cpu.arch) {
     .x86 => @import("x86_32/video/video.zig"),
     else => @compileError("Unsupported architecture for video"),
 };
+
+pub const mem = @import("common/mem.zig");
 
 test {
     @import("std").testing.refAllDecls(@This());
