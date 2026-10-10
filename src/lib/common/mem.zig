@@ -5,21 +5,18 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub const heap_range = blk: {
-    const heap = switch (builtin.cpu.arch) {
-        .x86 => @import("../x86_32/mem/heap.zig"),
-        .arm64 => @import("../arm64/mem/heap.zig"),
-        else => @compileError("Unsupported architecture for heap"),
-    };
+extern var __heap_start: u8;
+extern var __heap_end: u8;
 
-    break :blk heap.heap_range;
-};
+const heap_start: usize = @intFromPtr(&__heap_start);
+const heap_end: usize = @intFromPtr(&__heap_end);
+
+const heap_size = heap_end - heap_start;
 
 pub var heap_buffer: []u8 = @as(
     [*]u8,
-    @ptrFromInt(heap_range.start),
-)[0..heap_range.size];
-
+    @ptrFromInt(heap_start),
+)[0..heap_size];
 
 var fba: std.heap.FixedBufferAllocator = .init(heap_buffer);
 
