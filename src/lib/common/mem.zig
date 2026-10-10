@@ -8,18 +8,23 @@ const std = @import("std");
 extern var __heap_start: u8;
 extern var __heap_end: u8;
 
-const heap_start: usize = @intFromPtr(&__heap_start);
-const heap_end: usize = @intFromPtr(&__heap_end);
-
-const heap_size = heap_end - heap_start;
-
-pub var heap_buffer: []u8 = @as(
-    [*]u8,
-    @ptrFromInt(heap_start),
-)[0..heap_size];
-
-var fba: std.heap.FixedBufferAllocator = .init(heap_buffer);
+var initialized = false;
+var fba: std.heap.FixedBufferAllocator = undefined;
 
 pub fn allocator() std.mem.Allocator {
+    if (!initialized) {
+        const heap_start = @intFromPtr(&__heap_start);
+        const heap_end = @intFromPtr(&__heap_end);
+        const heap_size = heap_end - heap_start;
+
+        const heap_buffer = @as(
+            [*]u8,
+            @ptrFromInt(heap_start),
+        )[0..heap_size];
+
+        fba = .init(heap_buffer);
+        initialized = true;
+    }
+
     return fba.allocator();
 }
