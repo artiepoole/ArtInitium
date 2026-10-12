@@ -5,7 +5,7 @@
 
 OUTPUT_ARCH(aarch64)
 OUTPUT_FORMAT("elf64-littleaarch64") /* ELF for arm64 */
-ENTRY(arm64_start)
+ENTRY(_start)
 
 /* arbitrary start address - will aim to make it PIE eventually */
 START_ADDR = 0x40080000;
@@ -16,6 +16,7 @@ SECTIONS
     . = START_ADDR;
     .text :
     {
+        KEEP(*(.text.boot))
         *(.text .text.*)
     }
 
@@ -31,8 +32,16 @@ SECTIONS
 
     .bss :
     {
+        __bss_start = .;
         *(.bss .bss.* COMMON)
+        __bss_end = .;
     }
+
+    __heap_start = ALIGN(., 64);
+    __heap_size  = 0x100000; /* 1 MiB heap */
+    __heap_end   = __heap_start + __heap_size;
+
+    __stack_top = . + 0x10000;  /* 64KB stack above BSS */
 
     /* Discard unwanted sections */
     /DISCARD/ :
